@@ -4,6 +4,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 
 from auth.logic.tokens import decode_access_token
+from db.tables import Registration
 
 bearer = HTTPBearer(auto_error=True)
 
@@ -18,3 +19,18 @@ def get_current_account_id(
         return str(sub)
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+# add this 
+async def get_current_user_role(account_id: str = Depends(get_current_account_id)) -> str:
+    reg = await Registration.objects().where(Registration.account == account_id).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    return reg.role
+
+async def require_admin(role: str = Depends(get_current_user_role)):
+    if role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Admin access required"
+        )
+    return role

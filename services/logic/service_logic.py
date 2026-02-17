@@ -21,5 +21,6 @@ async def delete_existing_service(service_id: str):
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
     
+    service_name=service.name
     await service.remove()
-    return {"detail": "Service deleted successfully"}
+    return service_name

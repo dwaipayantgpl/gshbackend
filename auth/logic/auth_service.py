@@ -48,7 +48,8 @@ async def signin(*, phone: str, password: str) -> dict:
             user_type = reg.role
         elif reg.role == "both":
             user_type = "seeker"  # default side
-        # admin → None
+        elif reg.role == "admin":
+            user_type = "admin"
 
     token = create_access_token(sub=str(account.id))
     return {
