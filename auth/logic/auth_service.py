@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from asyncpg.exceptions import UniqueViolationError
 
+from auth.structs.dtos import ChangePasswordIn
 from db.tables import Account, Registration
 from auth.logic.passwords import hash_password, verify_password
 from auth.logic.tokens import create_access_token
@@ -68,3 +69,23 @@ async def get_me(*, account_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Registration not found")
 
     return {"accountId": str(account.id), "role": reg.role}
+
+
+async def update_password(account_id: str, payload: ChangePasswordIn):
+    # 1. Fetch account from DB
+    account = await Account.objects().where(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # 2. Verify Old Password
+    if not verify_password(payload.old_password, account.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Current password (old password) is incorrect"
+        )
+
+    # 3. Hash and Update New Password
+    account.password_hash = hash_password(payload.new_password)
+    await account.save()
+    
+    return {"message": "Password updated successfully"}

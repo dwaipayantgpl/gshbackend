@@ -1,6 +1,6 @@
 # services/logic/service_logic.py
 from fastapi import HTTPException, status
-from db.tables import Service
+from db.tables import Registration, Service
 import uuid
 
 async def update_existing_service(service_id: str, data: dict):
@@ -24,3 +24,32 @@ async def delete_existing_service(service_id: str):
     service_name=service.name
     await service.remove()
     return service_name
+
+async def get_admin_user_report():
+    # 1. Calculate counts
+    helpers_count = await Registration.count().where(Registration.role == 'helper')
+    seekers_count = await Registration.count().where(Registration.role == 'seeker')
+    
+
+    # 2. Fetch full table with joins
+    # We select fields from Registration and follow the 'account' foreign key to get phone/name
+    raw_data = await Registration.select(
+        Registration.account.id,
+        Registration.account.phone,
+        Registration.role
+    ).run()
+
+    # Format the data for the DTO
+    user_list = [
+        {
+            "account_id": str(item["account.id"]),
+            "phone": item["account.phone"],
+            "role": item["role"]
+        } for item in raw_data
+    ]
+
+    return {
+        "total_helpers": helpers_count,
+        "total_seekers": seekers_count,
+        "users": user_list
+    }

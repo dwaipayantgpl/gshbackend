@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 
 from db.tables import (
+    Account,
     Registration,
     SeekerPersonal,
     SeekerInstitutional,
@@ -58,10 +59,18 @@ def _validate_payload_against_registration(*, reg: Registration, kind: str) -> N
             detail=f"Role mismatch: you are '{reg.role}', but payload is for '{meta['side']}'",
         )
 
+async def _find_phone_number_by_registration(account_id:str)->Account:
+    find=await Account.objects().where(Account.id==account_id).first()
+    if not find:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found for this account_id",
+        )
+    return find.phone
 
 async def get_my_profile(*, account_id: str) -> ProfileOut:
     reg = await _get_registration_by_account_id(account_id)
-
+    phoneno=await _find_phone_number_by_registration(reg.account)
     # Decide default kind for GET:
     # - if role is seeker => seeker_{capacity}
     # - if role is helper => helper_{capacity}
@@ -75,6 +84,7 @@ async def get_my_profile(*, account_id: str) -> ProfileOut:
         return ProfileOut(
             registration_id=str(reg.id),
             role=reg.role,
+            phone=phoneno,
             capacity=reg.capacity,
             profile_kind=None,
             profile={},
@@ -86,6 +96,7 @@ async def get_my_profile(*, account_id: str) -> ProfileOut:
     return ProfileOut(
         registration_id=str(reg.id),
         role=reg.role,
+        phone=phoneno,
         capacity=reg.capacity,
         profile_kind=kind if row else None,
         profile=row.to_dict() if row else {},

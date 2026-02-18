@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status # Fixed imports
 from auth.logic.deps import get_current_account_id, require_admin
 from db.tables import Service # Use consistent path
 from services.logic import service_logic
-from services.structs.dtos import ServiceCreateIn, ServiceOut, ServiceUpdateIn
+from services.structs.dtos import AdminDashboardOut, ServiceCreateIn, ServiceOut, ServiceUpdateIn
 
 router = APIRouter()
 
@@ -40,16 +40,6 @@ async def update_service(
     )
 
 
-# @router.delete("/delete/{service_id}", status_code=status.HTTP_200_OK, summary="Admin Only: Delete a service")
-# async def delete_service(
-#     service_id: str,
-#     _admin: str = Depends(require_admin)
-# ):
-#     service_name= await service_logic.delete_existing_service(service_id)
-#     return {"message": f"Service '{service_name}' successfully deleted"}
-
-
-
 @router.delete("/delete/{service_id}", status_code=status.HTTP_200_OK, summary="Admin Only: Delete a service")
 async def delete_service(
     service_id: str,
@@ -77,3 +67,14 @@ async def list_services():
     """
     from db.tables import Service
     return await Service.objects().order_by(Service.name)
+
+#user report
+@router.get("/admin/user-report", response_model=AdminDashboardOut, summary="Admin: Get all Helper/Seeker details")
+async def admin_user_report(
+    _admin: str = Depends(require_admin)
+):
+    """
+    Returns total counts and a detailed list of every helper and seeker 
+    with their phone numbers and names.
+    """
+    return await service_logic.get_admin_user_report()

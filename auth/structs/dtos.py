@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from auth.structs.enums import Role, Capacity
 
 class SignUpIn(BaseModel):
@@ -36,3 +36,14 @@ class AccountOut(BaseModel):
 class MeOut(BaseModel):
     accountId: str
     role: str
+
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=8)
+    confirm_password: str
+
+    @model_validator(mode='after')
+    def check_passwords_match(self):
+        if self.new_password != self.confirm_password:
+            raise ValueError("New passwords do not match")
+        return self

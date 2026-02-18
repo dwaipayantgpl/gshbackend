@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 import uuid
 
 class ServiceCreateIn(BaseModel):
@@ -23,3 +23,20 @@ class ServiceStasOut(BaseModel):
     service:str
     helper:int
     seeker:int
+
+class UserReportOut(BaseModel):
+    account_id: str
+    name: str
+    phone: str
+    role: str  # 'helper' or 'seeker'
+
+
+class UserReportOut(BaseModel):
+    account_id: str
+    phone: str
+    role: str  # 'helper' or 'seeker'
+
+class AdminDashboardOut(BaseModel):
+    total_helpers: int
+    total_seekers: int
+    users: List[UserReportOut]

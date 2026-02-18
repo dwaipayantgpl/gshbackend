@@ -58,6 +58,7 @@ JOB_STATUS_CHOICES = [
 
 
 
+
 # ---------- Core identity ----------
 
 class Account(Table):

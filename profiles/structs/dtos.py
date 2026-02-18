@@ -66,6 +66,7 @@ ProfileUpsertIn = Annotated[
 class ProfileOut(BaseModel):
     registration_id: str
     role: str
+    phone:str
     capacity: str
     profile_kind: Optional[str] = None
     profile: dict = Field(default_factory=dict)
