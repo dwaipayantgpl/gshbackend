@@ -1,7 +1,7 @@
 # app/auth/endpoints/router.py
 from fastapi import APIRouter, status, Depends
 from auth.logic import auth_service
-from auth.structs.dtos import ChangePasswordIn, SignUpIn, SignInIn, SignInOut, SignUpOut
+from auth.structs.dtos import ChangePasswordIn, ForgotPasswordIn, SignUpIn, SignInIn, SignInOut, SignUpOut
 from auth.logic.auth_service import signup, signin
 from auth.structs.dtos import MeOut
 from auth.logic.deps import get_current_account_id
@@ -65,9 +65,15 @@ async def signin_endpoint(payload: SignInIn):
 async def me_endpoint(account_id: str = Depends(get_current_account_id)):
     return await get_me(account_id=account_id)
 
+#Change password
 @router.post("/change-password", summary="Update user password")
 async def change_password(
     payload: ChangePasswordIn,
     account_id: str = Depends(get_current_account_id) # Ensures user is logged in
 ):
     return await auth_service.update_password(account_id, payload)
+
+#for get password
+@router.post("/forgot-password", summary="Reset password using only phone (No OTP)")
+async def forgot_password(payload: ForgotPasswordIn):
+    return await auth_service.reset_password(payload)

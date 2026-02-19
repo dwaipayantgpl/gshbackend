@@ -307,3 +307,16 @@ class MessageAttachment(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
     message = ForeignKey(references=Message)
     file_path = Text()
+
+
+# block list user
+class BlacklistedUser(Table):
+    phone = Varchar(length=20, unique=True)
+    reason = Text()
+    banned_at = Timestamptz()
+
+class BlockedUser(Table):
+    # This links to your existing Account table
+    account = ForeignKey(references=Account, unique=True) 
+    reason = Text()
+    blocked_at = Timestamptz(auto_now=True)

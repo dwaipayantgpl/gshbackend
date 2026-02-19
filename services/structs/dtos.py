@@ -1,3 +1,4 @@
+from datetime import date
 from pydantic import BaseModel
 from typing import List, Optional
 import uuid
@@ -36,7 +37,23 @@ class UserReportOut(BaseModel):
     phone: str
     role: str  # 'helper' or 'seeker'
 
+
+
+class UserReportDetail(BaseModel):
+    account_id: str
+    phone: str
+    role: str
+    capacity: str
+    is_active: bool
+    name: str
+    city: str
+    area: str
+
 class AdminDashboardOut(BaseModel):
     total_helpers: int
     total_seekers: int
-    users: List[UserReportOut]
+    users: List[UserReportDetail]
+
+class DateRangeIn(BaseModel):
+    start_date: date
+    end_date: date

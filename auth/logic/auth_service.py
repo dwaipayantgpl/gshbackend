@@ -1,8 +1,8 @@
 from fastapi import HTTPException, status
 from asyncpg.exceptions import UniqueViolationError
 
-from auth.structs.dtos import ChangePasswordIn
-from db.tables import Account, Registration
+from auth.structs.dtos import ChangePasswordIn, ForgotPasswordIn
+from db.tables import Account, BlacklistedUser, Registration
 from auth.logic.passwords import hash_password, verify_password
 from auth.logic.tokens import create_access_token
 
@@ -12,6 +12,13 @@ async def signup(*, phone: str, password: str, role: str, capacity: str) -> dict
     existing = await Account.objects().where(Account.phone == phone).first()
     if existing:
         raise HTTPException(status_code=409, detail="Phone already registered")
+
+    is_banned = await BlacklistedUser.objects().where(BlacklistedUser.phone == phone).first()
+    if is_banned:
+        raise HTTPException(
+            status_code=403, 
+            detail="This phone number is permanently banned from this platform."
+    )
 
     try:
         account = Account(phone=phone, password_hash=hash_password(password), is_active=True)
@@ -38,9 +45,14 @@ async def signup(*, phone: str, password: str, role: str, capacity: str) -> dict
 
 async def signin(*, phone: str, password: str) -> dict:
     account = await Account.objects().where(Account.phone == phone).first()
+    is_banned = await BlacklistedUser.objects().where(BlacklistedUser.phone == phone).first()
+    if is_banned:
+        raise HTTPException(
+            status_code=403, 
+            detail="This phone number is permanently banned from this platform."
+        )
     if not account or not verify_password(password, account.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-
     reg = await Registration.objects().where(Registration.account == account.id).first()
 
     user_type = None
@@ -89,3 +101,26 @@ async def update_password(account_id: str, payload: ChangePasswordIn):
     await account.save()
     
     return {"message": "Password updated successfully"}
+
+
+async def reset_password(payload: ForgotPasswordIn):
+    # 1. Check if passwords match
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    # 2. Find the account by phone
+    account = await Account.objects().where(Account.phone == payload.phone).first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="No account found with this phone number")
+
+    if verify_password(payload.new_password, account.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, 
+            detail="The new password cannot be the same as your current password. Please choose a different one."
+        )
+    # 3. Update with new hashed password
+    account.password_hash = hash_password(payload.new_password)
+    await account.save()
+    
+    return {"message": f"Password for {payload.phone} has been reset successfully"}

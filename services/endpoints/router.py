@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status # Fixed imports
 from auth.logic.deps import get_current_account_id, require_admin
 from db.tables import Service # Use consistent path
 from services.logic import service_logic
-from services.structs.dtos import AdminDashboardOut, ServiceCreateIn, ServiceOut, ServiceUpdateIn
+from services.structs.dtos import AdminDashboardOut, DateRangeIn, ServiceCreateIn, ServiceOut, ServiceUpdateIn
 
 router = APIRouter()
 
@@ -77,4 +77,15 @@ async def admin_user_report(
     Returns total counts and a detailed list of every helper and seeker 
     with their phone numbers and names.
     """
-    return await service_logic.get_admin_user_report()
+    return await service_logic.get_admin_user_report() 
+
+#check total head count between two specific dates
+@router.post("/admin/analytics/range-report", summary="Admin: Growth between two dates")
+async def get_range_report(
+    payload: DateRangeIn,
+    _admin: str = Depends(require_admin)
+):
+    return await service_logic.get_growth_by_date(
+        payload.start_date, 
+        payload.end_date
+    )

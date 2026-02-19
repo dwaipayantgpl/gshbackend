@@ -47,3 +47,8 @@ class ChangePasswordIn(BaseModel):
         if self.new_password != self.confirm_password:
             raise ValueError("New passwords do not match")
         return self
+    
+class ForgotPasswordIn(BaseModel):
+    phone: str
+    new_password: str = Field(min_length=8)
+    confirm_password: str
