@@ -57,7 +57,12 @@ JOB_STATUS_CHOICES = [
 ]
 
 
-
+COMPLAINT_STATUS_CHOICES = [
+    Choice("pending", "pending"),
+    Choice("in_progress", "in_progress"),
+    Choice("resolved", "resolved"),
+    Choice("blocked", "blocked"), # Good to track if the issue led to a block
+]
 
 # ---------- Core identity ----------
 
@@ -312,11 +317,25 @@ class MessageAttachment(Table):
 # block list user
 class BlacklistedUser(Table):
     phone = Varchar(length=20, unique=True)
-    reason = Text()
+    #reason = Text()
     banned_at = Timestamptz()
 
 class BlockedUser(Table):
     # This links to your existing Account table
     account = ForeignKey(references=Account, unique=True) 
-    reason = Text()
+    #reason = Text()
     blocked_at = Timestamptz(auto_now=True)
+
+
+# ---------- Complaint Table ----------
+class Complaint(Table):
+    """
+    User submitted issues/complaints.
+    """
+    id = UUID(primary_key=True, default=uuid.uuid4)
+    account = ForeignKey(references=Account)
+    subject = Varchar(length=100)
+    description = Text()
+    status = Varchar(length=20, choices=COMPLAINT_STATUS_CHOICES, default="pending")
+    admin_note = Text(null=True)  # Added to store admin's reasoning
+    created_at = Timestamptz(auto_now=True)

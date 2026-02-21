@@ -1,15 +1,5 @@
-from datetime import date, datetime
 from pydantic import BaseModel
-from typing import List, Optional
-import uuid
-class DeleteReason(BaseModel):
-    reason: str
-
-class StatusUpdate(BaseModel):
-    reason: str
-
-class BlockRequest(BaseModel):
-    reason: str
+from datetime import datetime
 
 class ComplaintCreate(BaseModel):
     subject: str

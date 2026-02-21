@@ -9,9 +9,7 @@ from profiles.endpoints.router import router as profiles_router
 from helper.endpoints.router import router as helper_router
 from services.endpoints.router import router as services_router
 from admin.endpoints.router import router as admin_router 
-
-from fastapi import FastAPI
-
+from complaint.endpoints.router import router as complains_router
 app = FastAPI()
 from dotenv import load_dotenv
 
@@ -46,3 +44,4 @@ app.include_router(profiles_router, prefix="/profiles", tags=["profiles"])
 app.include_router(helper_router, prefix="/helper", tags=["helper"])
 app.include_router(services_router, prefix="/services", tags=["Services"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
+app.include_router(complains_router,prefix="/complaint", tags=["complaint"])

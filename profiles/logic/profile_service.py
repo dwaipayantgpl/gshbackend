@@ -105,7 +105,7 @@ async def get_my_profile(*, account_id: str) -> ProfileOut:
 
 async def upsert_my_profile(*, account_id: str, payload: ProfileUpsertIn) -> ProfileOut:
     reg = await _get_registration_by_account_id(account_id)
-
+    phoneno = await _find_phone_number_by_registration(reg.account)
     kind = payload.kind
     _validate_payload_against_registration(reg=reg, kind=kind)
 
@@ -129,6 +129,7 @@ async def upsert_my_profile(*, account_id: str, payload: ProfileUpsertIn) -> Pro
     return ProfileOut(
         registration_id=str(reg.id),
         role=reg.role,
+        phone=phoneno,
         capacity=reg.capacity,
         profile_kind=kind,
         profile=row.to_dict(),

@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException
+from admin.structs.dtos import ComplaintCreate
 from db.tables import (
-     BlacklistedUser, BlockedUser, HelperPreference, HelperService, JobRequestService, Registration, Account, SeekerPersonal, SeekerInstitutional, 
+     BlacklistedUser, BlockedUser, Complaint, HelperPreference, HelperService, JobRequestService, Registration, Account, SeekerPersonal, SeekerInstitutional, 
     HelperPersonal, HelperInstitutional, Service
 )
 
@@ -144,45 +145,47 @@ async def get_service_deep_analytics():
 
 
 
-async def admin_delete_user_permanently(account_id: str, reason: str):
+async def admin_delete_user_permanently(account_id: str): # Reason removed from here
     # 1. Get the account
     account = await Account.objects().where(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 2. Add to Blacklist with the dynamic reason and timestamp
+    # 2. Add to Blacklist (Updated to match your new table schema)
     await BlacklistedUser.insert(
         BlacklistedUser(
             phone=account.phone, 
-            reason=reason, 
             banned_at=datetime.now()
+            # reason=reason removed because column is gone
         )
     )
 
-    # 3. Cleanup logic (Same as yours...)
+    # 3. Find Registration to clean up profiles
     reg = await Registration.objects().where(Registration.account == account_id).first()
     if reg:
-        # Delete profiles, then registration
+        # Delete profile data first (Child tables)
         await SeekerPersonal.delete().where(SeekerPersonal.registration == reg.id)
         await SeekerInstitutional.delete().where(SeekerInstitutional.registration == reg.id)
         await HelperPersonal.delete().where(HelperPersonal.registration == reg.id)
         await HelperInstitutional.delete().where(HelperInstitutional.registration == reg.id)
+        
+        # Delete the registration itself
         await reg.remove()
 
-    # 4. Remove Account
+    # 4. Finally, remove the Account
     await account.remove()
-    return {"message": f"User blacklisted for: {reason}"}
+    return {"message": "User deleted and phone number blacklisted permanently."}
 
 
 #block-unblock
-async def block_user_logic(account_id: str, reason: str):
+async def block_user_logic(account_id: str):
     # Check if already blocked
     exists = await BlockedUser.objects().where(BlockedUser.account == account_id).first()
     if exists:
         return {"message": "User is already blocked."}
     
-    await BlockedUser.insert(BlockedUser(account=account_id, reason=reason))
-    return {"message": "User blocked successfully."}
+    await BlockedUser.insert(BlockedUser(account=account_id))
+    return {"message": f"User blocked successfully"}
 
 # --- UNBLOCK USER ---
 async def unblock_user_logic(account_id: str):
@@ -212,3 +215,31 @@ async def get_helper_status_stats():
             "inactive_helpers": inactive_helpers
         }
     }
+
+#Complain 
+async def submit_complaint(account_id: str, payload: ComplaintCreate):
+    complaint = Complaint(
+        account=account_id,
+        subject=payload.subject,
+        description=payload.description
+    )
+    await complaint.save()
+    return {"message": "Complaint submitted successfully"}
+
+async def get_all_complaints():
+    # Join with Account to show the phone number of the person complaining
+    return await Complaint.select(
+        Complaint.id,
+        Complaint.subject,
+        Complaint.description,
+        Complaint.status,
+        Complaint.created_at,
+        Complaint.account.id.as_alias("account_id"),
+        Complaint.account.phone.as_alias("phone")
+    ).order_by(Complaint.created_at, ascending=False).run()
+
+async def update_complaint_status(complaint_id: str, status: str):
+    complaint = await Complaint.objects().get(Complaint.id == complaint_id)
+    complaint.status = status
+    await complaint.save()
+    return {"message": f"Complaint status updated to {status}"}
