@@ -30,15 +30,19 @@ async def delete_user_api(
     # Just pass the account_id
     return await admin_service.admin_delete_user_permanently(account_id)
 
+
 #block-unblock
 @router.get("/users/{account_id}/block")
-async def block_user(account_id: str):
+async def block_user(account_id: str , _admin: str = Depends(require_admin)):
     return await admin_service.block_user_logic(account_id)
 
 @router.delete("/users/{account_id}/unblock")
-async def unblock_user(account_id: str):
+async def unblock_user(account_id: str , _admin: str = Depends(require_admin)):
     return await admin_service.unblock_user_logic(account_id)
 
+@router.get("/blocked-users", summary="Admin: View all blocked users")
+async def view_blocked(_admin: str = Depends(require_admin)):
+    return await admin_service.get_all_blocked_users()
 
 #get helper data api
 @router.get("/helpers/counts", summary="Admin: Total/Active/Inactive Helper Stats")
@@ -46,6 +50,8 @@ async def get_helper_counts(
     _admin: str = Depends(require_admin)
 ):
     return await admin_service.get_helper_status_stats()
+
+
 
 #complain data api
 @router.post("/user/complaints", summary="User: Submit a complaint")

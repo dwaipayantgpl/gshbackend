@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from admin.structs.dtos import ComplaintCreate
 from db.tables import (
      BlacklistedUser, BlockedUser, Complaint, HelperPreference, HelperService, JobRequestService, Registration, Account, SeekerPersonal, SeekerInstitutional, 
-    HelperPersonal, HelperInstitutional, Service
+    HelperPersonal, HelperInstitutional, SeekerPreference, Service
 )
 
 async def get_last_month_user_report():
@@ -68,69 +68,138 @@ async def get_last_month_user_report():
     }
 
 
+# async def get_service_deep_analytics():
+#     all_services = await Service.objects()
+#     report = []
+
+#     for s in all_services:
+#         # 1. FETCH HELPERS
+#         # Only select fields that actually exist in Registration/Account
+#         helpers_data = await HelperService.select(
+#             HelperService.helper.id,
+#             HelperService.helper.capacity,
+#             HelperService.helper.account.phone,
+#         ).where(HelperService.service == s.id).run()
+
+#         detailed_helpers = []
+#         for h in helpers_data:
+#             h_id = h['helper.id']
+#             capacity = h['helper.capacity']
+            
+#             # Find the name in the correct table based on capacity
+#             name = "Unknown"
+#             if capacity == 'personal':
+#                 profile = await HelperPersonal.objects().where(HelperPersonal.registration == h_id).first()
+#                 if profile: name = profile.name
+#             else:
+#                 profile = await HelperInstitutional.objects().where(HelperInstitutional.registration == h_id).first()
+#                 if profile: name = profile.name
+
+#             # Get preference
+#             pref = await HelperPreference.objects().where(HelperPreference.registration == h_id).first()
+            
+#             detailed_helpers.append({
+#                 "name": name,
+#                 "phone": h['helper.account.phone'],
+#                 "capacity": capacity,
+#                 "shift": pref.job_type if pref else "not_specified"
+#             })
+
+#         # 2. FETCH SEEKERS
+#         seekers_data = await JobRequestService.select(
+#             JobRequestService.job_request.seeker.id,
+#             JobRequestService.job_request.seeker.capacity,
+#             JobRequestService.job_request.job_type,
+#             JobRequestService.job_request.seeker.account.phone
+#         ).where(JobRequestService.service == s.id).run()
+
+#         detailed_seekers = []
+#         for sk in seekers_data:
+#             sk_id = sk['job_request.seeker.id']
+#             capacity = sk['job_request.seeker.capacity']
+
+#             name = "Unknown"
+#             if capacity == 'personal':
+#                 profile = await SeekerPersonal.objects().where(SeekerPersonal.registration == sk_id).first()
+#                 if profile: name = profile.name
+#             else:
+#                 profile = await SeekerInstitutional.objects().where(SeekerInstitutional.registration == sk_id).first()
+#                 if profile: name = profile.name
+
+#             detailed_seekers.append({
+#                 "name": name,
+#                 "phone": sk['job_request.seeker.account.phone'],
+#                 "capacity": capacity,
+#                 "shift": sk['job_request.job_type']
+#             })
+
+#         report.append({
+#             "service_name": s.name,
+#             "total_helpers": len(detailed_helpers), 
+#             "total_seekers": len(detailed_seekers),
+#             "helpers": detailed_helpers,
+#             "seekers": detailed_seekers
+#         })
+
+#     return report
+
 async def get_service_deep_analytics():
     all_services = await Service.objects()
     report = []
 
     for s in all_services:
-        # 1. FETCH HELPERS
-        # Only select fields that actually exist in Registration/Account
+        # --- 1. FETCH HELPERS ---
         helpers_data = await HelperService.select(
-            HelperService.helper.id,
-            HelperService.helper.capacity,
-            HelperService.helper.account.phone,
+            HelperService.helper.id.as_alias("h_id"),
+            HelperService.helper.capacity.as_alias("capacity"),
+            HelperService.helper.account.phone.as_alias("phone"),
         ).where(HelperService.service == s.id).run()
 
         detailed_helpers = []
         for h in helpers_data:
-            h_id = h['helper.id']
-            capacity = h['helper.capacity']
+            h_id = h['h_id']
+            cap = h['capacity']
             
-            # Find the name in the correct table based on capacity
+            # Name lookup logic
             name = "Unknown"
-            if capacity == 'personal':
-                profile = await HelperPersonal.objects().where(HelperPersonal.registration == h_id).first()
-                if profile: name = profile.name
-            else:
-                profile = await HelperInstitutional.objects().where(HelperInstitutional.registration == h_id).first()
-                if profile: name = profile.name
+            Table = HelperPersonal if cap == 'personal' else HelperInstitutional
+            profile = await Table.objects().where(Table.registration == h_id).first().run()
+            if profile: name = profile.name
 
-            # Get preference
-            pref = await HelperPreference.objects().where(HelperPreference.registration == h_id).first()
+            # Preference lookup (for shift)
+            pref = await HelperPreference.objects().where(HelperPreference.registration == h_id).first().run()
             
             detailed_helpers.append({
                 "name": name,
-                "phone": h['helper.account.phone'],
-                "capacity": capacity,
+                "phone": h['phone'],
+                "capacity": cap,
                 "shift": pref.job_type if pref else "not_specified"
             })
 
-        # 2. FETCH SEEKERS
-        seekers_data = await JobRequestService.select(
-            JobRequestService.job_request.seeker.id,
-            JobRequestService.job_request.seeker.capacity,
-            JobRequestService.job_request.job_type,
-            JobRequestService.job_request.seeker.account.phone
-        ).where(JobRequestService.service == s.id).run()
+        # --- 2. FETCH SEEKERS (Using SeekerPreference instead of JobRequest) ---
+        # Note: If you want people who just "selected" the service, use SeekerPreference
+        seekers_data = await SeekerPreference.select(
+            SeekerPreference.registration.id.as_alias("sk_id"),
+            SeekerPreference.registration.capacity.as_alias("capacity"),
+            SeekerPreference.registration.account.phone.as_alias("phone"),
+            SeekerPreference.job_type.as_alias("shift")
+        ).where(SeekerPreference.service == s.id).run()
 
         detailed_seekers = []
         for sk in seekers_data:
-            sk_id = sk['job_request.seeker.id']
-            capacity = sk['job_request.seeker.capacity']
+            sk_id = sk['sk_id']
+            cap = sk['capacity']
 
             name = "Unknown"
-            if capacity == 'personal':
-                profile = await SeekerPersonal.objects().where(SeekerPersonal.registration == sk_id).first()
-                if profile: name = profile.name
-            else:
-                profile = await SeekerInstitutional.objects().where(SeekerInstitutional.registration == sk_id).first()
-                if profile: name = profile.name
+            Table = SeekerPersonal if cap == 'personal' else SeekerInstitutional
+            profile = await Table.objects().where(Table.registration == sk_id).first().run()
+            if profile: name = profile.name
 
             detailed_seekers.append({
                 "name": name,
-                "phone": sk['job_request.seeker.account.phone'],
-                "capacity": capacity,
-                "shift": sk['job_request.job_type']
+                "phone": sk['phone'],
+                "capacity": cap,
+                "shift": sk['shift']
             })
 
         report.append({
@@ -142,8 +211,6 @@ async def get_service_deep_analytics():
         })
 
     return report
-
-
 
 async def admin_delete_user_permanently(account_id: str): # Reason removed from here
     # 1. Get the account
@@ -195,6 +262,53 @@ async def unblock_user_logic(account_id: str):
     
     await blocked_record.remove()
     return {"message": "User unblocked successfully."}
+
+# --- get all user blocked data -----------
+async def get_all_blocked_users():
+    blocked_list = await BlockedUser.select(
+        BlockedUser.account.id.as_alias("account_id"),
+        BlockedUser.account.phone.as_alias("phone"),
+        BlockedUser.blocked_at
+    ).run()
+
+    results = []
+
+    for entry in blocked_list:
+        acc_id = entry["account_id"]
+        
+        # 2. Get Registration details (Role & Capacity)
+        reg = await Registration.objects().get(
+            Registration.account == acc_id
+        ).run()
+
+        if reg:
+            # 3. Fetch Name based on capacity and role
+            user_name = "Unknown"
+            
+            # Check Seeker tables
+            sp = await SeekerPersonal.select(SeekerPersonal.name).where(SeekerPersonal.registration == reg.id).first().run()
+            si = await SeekerInstitutional.select(SeekerInstitutional.name).where(SeekerInstitutional.registration == reg.id).first().run()
+            
+            # Check Helper tables
+            hp = await HelperPersonal.select(HelperPersonal.name).where(HelperPersonal.registration == reg.id).first().run()
+            hi = await HelperInstitutional.select(HelperInstitutional.name).where(HelperInstitutional.registration == reg.id).first().run()
+
+            # Assign found name
+            found_name_obj = (sp or si or hp or hi)
+            if found_name_obj:
+                user_name = found_name_obj["name"]
+
+            # 4. Build the final object
+            results.append({
+                "account_id": acc_id,
+                "name": user_name,
+                "phone": entry["phone"],
+                "role": reg.role,
+                "capacity": reg.capacity,
+                "blocked_at": entry["blocked_at"]
+            })
+
+    return results
 
 
 #get helper data

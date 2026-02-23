@@ -13,7 +13,6 @@ from piccolo.columns import (
 )
 from piccolo.columns.choices import Choice
 
-
 # ---------- Choice sets (enums) ----------
 
 ROLE_CHOICES = [
@@ -339,3 +338,14 @@ class Complaint(Table):
     status = Varchar(length=20, choices=COMPLAINT_STATUS_CHOICES, default="pending")
     admin_note = Text(null=True)  # Added to store admin's reasoning
     created_at = Timestamptz(auto_now=True)
+
+# ---------- seeker Helper preferences ----------
+class SeekerPreference(Table):
+    registration = ForeignKey(references=Registration)
+    service = ForeignKey(references=Service)
+    city = Varchar(length=100)
+    area = Varchar(length=100)
+    job_type = Varchar(length=20, choices=JOB_TYPE_CHOICES, null=True) 
+
+    class Meta:
+        unique_together = (("registration", "service"),)

@@ -27,6 +27,12 @@ async def get_current_user_role(account_id: str = Depends(get_current_account_id
         raise HTTPException(status_code=404, detail="Registration not found")
     return reg.role
 
+async def get_current_registration(account_id: str = Depends(get_current_account_id)):
+    reg = await Registration.objects().where(Registration.account == account_id).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    return reg  # This returns the whole object, not just a string
+
 async def require_admin(role: str = Depends(get_current_user_role)):
     if role != "admin":
         raise HTTPException(

@@ -10,6 +10,9 @@ from helper.endpoints.router import router as helper_router
 from services.endpoints.router import router as services_router
 from admin.endpoints.router import router as admin_router 
 from complaint.endpoints.router import router as complains_router
+from chat.endpoints.router import router as chat_router
+from seeker.endpoints.router import router as seeker_router
+
 app = FastAPI()
 from dotenv import load_dotenv
 
@@ -45,3 +48,5 @@ app.include_router(helper_router, prefix="/helper", tags=["helper"])
 app.include_router(services_router, prefix="/services", tags=["Services"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(complains_router,prefix="/complaint", tags=["complaint"])
+app.include_router(chat_router,prefix="/chat", tags=["chat"])
+app.include_router(seeker_router,prefix="/seeker", tags=["seeker"])
