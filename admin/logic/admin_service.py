@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from admin.structs.dtos import ComplaintCreate
 from db.tables import (
      BlacklistedUser, BlockedUser, Complaint, HelperPreference, HelperService, JobRequestService, Registration, Account, SeekerPersonal, SeekerInstitutional, 
-    HelperPersonal, HelperInstitutional, SeekerPreference, Service
+    HelperPersonal, HelperInstitutional, SeekerPreferenceNew, Service
 )
 
 async def get_last_month_user_report():
@@ -68,80 +68,6 @@ async def get_last_month_user_report():
     }
 
 
-# async def get_service_deep_analytics():
-#     all_services = await Service.objects()
-#     report = []
-
-#     for s in all_services:
-#         # 1. FETCH HELPERS
-#         # Only select fields that actually exist in Registration/Account
-#         helpers_data = await HelperService.select(
-#             HelperService.helper.id,
-#             HelperService.helper.capacity,
-#             HelperService.helper.account.phone,
-#         ).where(HelperService.service == s.id).run()
-
-#         detailed_helpers = []
-#         for h in helpers_data:
-#             h_id = h['helper.id']
-#             capacity = h['helper.capacity']
-            
-#             # Find the name in the correct table based on capacity
-#             name = "Unknown"
-#             if capacity == 'personal':
-#                 profile = await HelperPersonal.objects().where(HelperPersonal.registration == h_id).first()
-#                 if profile: name = profile.name
-#             else:
-#                 profile = await HelperInstitutional.objects().where(HelperInstitutional.registration == h_id).first()
-#                 if profile: name = profile.name
-
-#             # Get preference
-#             pref = await HelperPreference.objects().where(HelperPreference.registration == h_id).first()
-            
-#             detailed_helpers.append({
-#                 "name": name,
-#                 "phone": h['helper.account.phone'],
-#                 "capacity": capacity,
-#                 "shift": pref.job_type if pref else "not_specified"
-#             })
-
-#         # 2. FETCH SEEKERS
-#         seekers_data = await JobRequestService.select(
-#             JobRequestService.job_request.seeker.id,
-#             JobRequestService.job_request.seeker.capacity,
-#             JobRequestService.job_request.job_type,
-#             JobRequestService.job_request.seeker.account.phone
-#         ).where(JobRequestService.service == s.id).run()
-
-#         detailed_seekers = []
-#         for sk in seekers_data:
-#             sk_id = sk['job_request.seeker.id']
-#             capacity = sk['job_request.seeker.capacity']
-
-#             name = "Unknown"
-#             if capacity == 'personal':
-#                 profile = await SeekerPersonal.objects().where(SeekerPersonal.registration == sk_id).first()
-#                 if profile: name = profile.name
-#             else:
-#                 profile = await SeekerInstitutional.objects().where(SeekerInstitutional.registration == sk_id).first()
-#                 if profile: name = profile.name
-
-#             detailed_seekers.append({
-#                 "name": name,
-#                 "phone": sk['job_request.seeker.account.phone'],
-#                 "capacity": capacity,
-#                 "shift": sk['job_request.job_type']
-#             })
-
-#         report.append({
-#             "service_name": s.name,
-#             "total_helpers": len(detailed_helpers), 
-#             "total_seekers": len(detailed_seekers),
-#             "helpers": detailed_helpers,
-#             "seekers": detailed_seekers
-#         })
-
-#     return report
 
 async def get_service_deep_analytics():
     all_services = await Service.objects()
@@ -176,14 +102,13 @@ async def get_service_deep_analytics():
                 "shift": pref.job_type if pref else "not_specified"
             })
 
-        # --- 2. FETCH SEEKERS (Using SeekerPreference instead of JobRequest) ---
-        # Note: If you want people who just "selected" the service, use SeekerPreference
-        seekers_data = await SeekerPreference.select(
-            SeekerPreference.registration.id.as_alias("sk_id"),
-            SeekerPreference.registration.capacity.as_alias("capacity"),
-            SeekerPreference.registration.account.phone.as_alias("phone"),
-            SeekerPreference.job_type.as_alias("shift")
-        ).where(SeekerPreference.service == s.id).run()
+
+        seekers_data = await SeekerPreferenceNew.select(
+            SeekerPreferenceNew.registration.id.as_alias("sk_id"),
+            SeekerPreferenceNew.registration.capacity.as_alias("capacity"),
+            SeekerPreferenceNew.registration.account.phone.as_alias("phone"),
+            SeekerPreferenceNew.job_type.as_alias("shift")
+        ).where(SeekerPreferenceNew.service == s.id).run()
 
         detailed_seekers = []
         for sk in seekers_data:

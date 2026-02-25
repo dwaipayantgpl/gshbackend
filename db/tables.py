@@ -2,6 +2,7 @@
 import uuid
 from piccolo.table import Table
 from piccolo.columns import (
+    JSONB,
     UUID,
     Varchar,
     Boolean,
@@ -320,9 +321,7 @@ class BlacklistedUser(Table):
     banned_at = Timestamptz()
 
 class BlockedUser(Table):
-    # This links to your existing Account table
     account = ForeignKey(references=Account, unique=True) 
-    #reason = Text()
     blocked_at = Timestamptz(auto_now=True)
 
 
@@ -340,12 +339,41 @@ class Complaint(Table):
     created_at = Timestamptz(auto_now=True)
 
 # ---------- seeker Helper preferences ----------
-class SeekerPreference(Table):
+class PreferenceLocation(Table):
+    city = Varchar(length=100, index=True)
+    area = Varchar(length=100, index=True)
+
+class PreferenceWork(Table):
+    job_type = Varchar(length=50) 
+    work_mode = Varchar(length=50)
+    working_days = Integer(default=6)
+    weekly_off = Varchar(length=20)
+    accommodation = Boolean(default=False)
+
+class PreferenceRequirements(Table):
+    min_salary = Integer(null=True,default=15000) 
+    max_salary = Integer(null=True,default=20000)
+    gender = Varchar(length=20, default="any")
+    min_age = Integer(null=True)
+    max_age = Integer(null=True)
+    experience = Varchar(length=50, default="0")
+
+class HelperDetails(Table):
+    skills = Varchar(length=500, null=True) 
+
+class SeekerPreferenceNew(Table):
     registration = ForeignKey(references=Registration)
     service = ForeignKey(references=Service)
-    city = Varchar(length=100)
-    area = Varchar(length=100)
-    job_type = Varchar(length=20, choices=JOB_TYPE_CHOICES, null=True) 
+    
+    # Use null=True here so the migration doesn't complain about old data
+    location = ForeignKey(references=PreferenceLocation, null=True)
+    work = ForeignKey(references=PreferenceWork, null=True)
+    requirements = ForeignKey(references=PreferenceRequirements, null=True)
+    helper_details = ForeignKey(references=HelperDetails, null=True)
 
     class Meta:
         unique_together = (("registration", "service"),)
+
+
+
+SeekerPreference = SeekerPreferenceNew
