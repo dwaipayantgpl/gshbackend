@@ -68,68 +68,76 @@ async def get_last_month_user_report():
     }
 
 
-
 async def get_service_deep_analytics():
     all_services = await Service.objects()
     report = []
 
     for s in all_services:
         # --- 1. FETCH HELPERS ---
-        helpers_data = await HelperService.select(
-            HelperService.helper.id.as_alias("h_id"),
-            HelperService.helper.capacity.as_alias("capacity"),
-            HelperService.helper.account.phone.as_alias("phone"),
-        ).where(HelperService.service == s.id).run()
+        # We use objects().prefetch() to get the related Preference and Registration data
+        helpers_query = await HelperService.objects().where(
+            HelperService.service == s.id
+        ).prefetch(
+            HelperService.helper,
+            HelperService.helper.account
+        ).run()
 
         detailed_helpers = []
-        for h in helpers_data:
-            h_id = h['h_id']
-            cap = h['capacity']
-            
-            # Name lookup logic
+        for hs in helpers_query:
+            h_reg = hs.helper
+            h_id = h_reg.id
+            cap = h_reg.capacity
+            phone = h_reg.account.phone if h_reg.account else "N/A"
+
+            # Fetch name
             name = "Unknown"
-            Table = HelperPersonal if cap == 'personal' else HelperInstitutional
-            profile = await Table.objects().where(Table.registration == h_id).first().run()
+            ProfileTable = HelperPersonal if cap == 'personal' else HelperInstitutional
+            profile = await ProfileTable.objects().where(ProfileTable.registration == h_id).first().run()
             if profile: name = profile.name
 
-            # Preference lookup (for shift)
+            # Fetch shift (Preference)
             pref = await HelperPreference.objects().where(HelperPreference.registration == h_id).first().run()
-            
+            shift = pref.job_type if pref else "not_specified"
+
             detailed_helpers.append({
                 "name": name,
-                "phone": h['phone'],
+                "phone": phone,
                 "capacity": cap,
-                "shift": pref.job_type if pref else "not_specified"
+                "shift": shift
             })
 
-
-        seekers_data = await SeekerPreferenceNew.select(
-            SeekerPreferenceNew.registration.id.as_alias("sk_id"),
-            SeekerPreferenceNew.registration.capacity.as_alias("capacity"),
-            SeekerPreferenceNew.registration.account.phone.as_alias("phone"),
-            SeekerPreferenceNew.job_type.as_alias("shift")
-        ).where(SeekerPreferenceNew.service == s.id).run()
+        # --- 2. FETCH SEEKERS ---
+        seekers_query = await SeekerPreferenceNew.objects().where(
+            SeekerPreferenceNew.service == s.id
+        ).prefetch(
+            SeekerPreferenceNew.registration,
+            SeekerPreferenceNew.registration.account,
+            SeekerPreferenceNew.work
+        ).run()
 
         detailed_seekers = []
-        for sk in seekers_data:
-            sk_id = sk['sk_id']
-            cap = sk['capacity']
+        for sk in seekers_query:
+            sk_reg = sk.registration
+            sk_id = sk_reg.id
+            cap = sk_reg.capacity
+            phone = sk_reg.account.phone if sk_reg.account else "N/A"
+            shift = sk.work.job_type if sk.work else "not_specified"
 
             name = "Unknown"
-            Table = SeekerPersonal if cap == 'personal' else SeekerInstitutional
-            profile = await Table.objects().where(Table.registration == sk_id).first().run()
+            ProfileTable = SeekerPersonal if cap == 'personal' else SeekerInstitutional
+            profile = await ProfileTable.objects().where(ProfileTable.registration == sk_id).first().run()
             if profile: name = profile.name
 
             detailed_seekers.append({
                 "name": name,
-                "phone": sk['phone'],
+                "phone": phone,
                 "capacity": cap,
-                "shift": sk['shift']
+                "shift": shift
             })
 
         report.append({
             "service_name": s.name,
-            "total_helpers": len(detailed_helpers), 
+            "total_helpers": len(detailed_helpers),
             "total_seekers": len(detailed_seekers),
             "helpers": detailed_helpers,
             "seekers": detailed_seekers
@@ -137,6 +145,7 @@ async def get_service_deep_analytics():
 
     return report
 
+    
 async def admin_delete_user_permanently(account_id: str): # Reason removed from here
     # 1. Get the account
     account = await Account.objects().where(Account.id == account_id).first()

@@ -193,17 +193,6 @@ class HelperSkill(Table):
 
 
 # ---------- Helper preferences & experience ----------
-
-class HelperPreference(Table):
-    """
-    Preferred working conditions for a helper (personal or institutional).
-    """
-    registration = ForeignKey(references=Registration, unique=True)
-    city = Varchar(length=100, null=True)
-    area = Varchar(length=100, null=True)
-    job_type = Varchar(length=20, choices=JOB_TYPE_CHOICES, null=True)
-
-
 class HelperPreferredService(Table):
     """
     Many-to-many: preferred services (subset of HelperService).
@@ -377,3 +366,19 @@ class SeekerPreferenceNew(Table):
 
 
 SeekerPreference = SeekerPreferenceNew
+
+#--------------------- Helper preference--------------
+class HelperSpecialPreferences(Table):
+    skills = Varchar(length=500, null=True) 
+    special_preferences = Varchar(length=1000, null=True) 
+
+class HelperPreference(Table):
+    registration = ForeignKey(references=Registration)
+    service = ForeignKey(references=Service) 
+    location = ForeignKey(references=PreferenceLocation, null=True) 
+    work = ForeignKey(references=PreferenceWork, null=True) 
+    requirements = ForeignKey(references=PreferenceRequirements, null=True) 
+    helperpreference_details = ForeignKey(references=HelperSpecialPreferences, null=True) 
+    class Meta:
+        unique_together = (("registration", "service"),)
+

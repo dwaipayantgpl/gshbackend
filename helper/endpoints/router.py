@@ -1,6 +1,13 @@
+from typing import Any, Dict
+
 from fastapi import APIRouter, Depends, status
 
-from auth.logic.deps import get_current_account_id
+from auth.logic.deps import get_current_account_id, get_current_registration
+from chat.logic import service
+from helper.logic import service
+from helper.endpoints import router
+
+from db.tables import HelperService, Registration
 from helper.logic.service import (
     get_preference_by_registration_id,
     list_experience_by_registration_id,
@@ -388,3 +395,29 @@ async def del_experience_me(
     account_id: str = Depends(get_current_account_id),
 ):
     return await delete_my_experience(account_id=account_id, experience_id=experience_id)
+
+
+@router.post("/addpreferences")
+async def add_helper_preferences(
+    data: Dict[str, Any], 
+    user: Registration = Depends(get_current_registration)
+):
+    return await service.add_helper_preference_logic(data, user.id)
+
+@router.patch("/updatepreferences")
+async def update_helper_preferences(
+    data: Dict[str, Any], 
+    user: Registration = Depends(get_current_registration)
+):
+    return await service.update_helper_preference_logic(data, user.id)
+
+@router.get("/my-preferences")
+async def get_my_preferences(
+    user: Registration = Depends(get_current_registration)
+):
+    return await service.get_helper_preference_logic(user.id)
+
+#find matched seekers
+@router.get("/find-my-seekers")
+async def find_my_seekers(user: Registration = Depends(get_current_registration)):
+    return await service.get_matches_for_helper_logic(user.id)
