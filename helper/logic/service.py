@@ -495,11 +495,11 @@ async def get_matches_for_helper_logic(user_id: str):
         SeekerPreferenceNew.requirements, SeekerPreferenceNew.helper_details
     ).run()
 
-    final_results = []
+    # Dictionary to group by seeker registration ID
+    grouped_results = {}
 
     for s in potential_seekers:
         # --- MANDATORY CITY CHECK ---
-        # If city similarity is low, skip this seeker immediately
         if get_similarity(s.location.city, h_main.location.city) < 0.95:
             continue
         
@@ -507,21 +507,17 @@ async def get_matches_for_helper_logic(user_id: str):
         checks = 0
 
         # --- MATCHING CALCULATIONS ---
-        # Area Match (Fuzzy)
         area_sim = get_similarity(s.location.area, h_main.location.area)
         if area_sim > 0.8: score += 1
         checks += 1 
 
-        # Work Mode & Accommodation
         if s.work.work_mode == h_main.work.work_mode: score += 1
         if s.work.accommodation == h_main.work.accommodation: score += 1
         checks += 2
 
-        # Salary Match
         if s.requirements.max_salary >= h_main.requirements.min_salary: score += 1
         checks += 1
 
-        # Age Match
         if helper_age:
             s_min = s.requirements.min_age or 0
             s_max = s.requirements.max_age or 100
@@ -530,39 +526,42 @@ async def get_matches_for_helper_logic(user_id: str):
 
         match_pct = (score / checks) * 100 if checks > 0 else 0
         
-        # --- DATA COLLECTION & PHONE FETCHING ---
         if match_pct >= 60:
-            s_reg = s.registration
+            s_reg_id = str(s.registration.id)
             
-            # 4. FIX: Use Direct Lookup instead of Join to avoid AttributeError
-            # We already have s_reg.account, so lookup Account directly by ID
-            account_record = await Account.objects().get(
-                Account.id == s_reg.account
-            ).run()
-            
+            # If this seeker is already in our dictionary, just add the service
+            if s_reg_id in grouped_results:
+                grouped_results[s_reg_id]["match_details"]["matched_services"].append(s.service.name)
+                # Keep the highest match score found
+                current_score = int(grouped_results[s_reg_id]["match_details"]["score"].replace("%", ""))
+                if match_pct > current_score:
+                    grouped_results[s_reg_id]["match_details"]["score"] = f"{round(match_pct)}%"
+                continue
+
+            # Otherwise, perform the profile/account lookups once
+            account_record = await Account.objects().get(Account.id == s.registration.account).run()
             contact_phone = account_record.phone if account_record else None
 
-            # 5. BRANCHING PROFILE LOGIC
-            if s_reg.capacity == 'personal':
-                s_profile = await SeekerPersonal.objects().where(SeekerPersonal.registration == s_reg.id).first().run()
+            if s.registration.capacity == 'personal':
+                s_profile = await SeekerPersonal.objects().where(SeekerPersonal.registration == s.registration.id).first().run()
             else:
-                s_profile = await SeekerInstitutional.objects().where(SeekerInstitutional.registration == s_reg.id).first().run()
-                # Use institutional phone if provided, otherwise keep account phone
+                s_profile = await SeekerInstitutional.objects().where(SeekerInstitutional.registration == s.registration.id).first().run()
                 if s_profile and s_profile.phone:
                     contact_phone = s_profile.phone
 
-            final_results.append({
+            # Store the data in the dictionary
+            grouped_results[s_reg_id] = {
                 "match_details": {
                     "score": f"{round(match_pct)}%",
-                    "matched_on_service": s.service.name
+                    "matched_services": [s.service.name] # Start a list of services
                 },
                 "seeker_info": {
-                    "registration_id": str(s_reg.id),
-                    "capacity": s_reg.capacity,
+                    "registration_id": s_reg_id,
+                    "capacity": s.registration.capacity,
                     "name": s_profile.name if s_profile else "Anonymous Seeker",
                     "rating": float(s_profile.avg_rating or 0.0),
                     "rating_count": s_profile.rating_count if s_profile else 0,
-                    "institution_type": getattr(s_profile, 'institution_type', None) if s_reg.capacity == 'institutional' else None,
+                    "institution_type": getattr(s_profile, 'institution_type', None) if s.registration.capacity == 'institutional' else None,
                     "contact_phone": contact_phone
                 },
                 "location": {
@@ -583,12 +582,106 @@ async def get_matches_for_helper_logic(user_id: str):
                     "experience_needed": s.requirements.experience,
                     "skills_required": s.helper_details.skills if s.helper_details else ""
                 }
-            })
+            }
 
-    # Sort results by match score descending
-    return sorted(final_results, key=lambda x: x['match_details']['score'], reverse=True)
+    # Convert dictionary back to a list and sort by score
+    final_results = list(grouped_results.values())
+    return sorted(final_results, key=lambda x: int(x['match_details']['score'].replace('%', '')), reverse=True)
 
 
-async def make_more_better():
-    return -1
+async def get_specific_helper_full_details(target_id: str, current_reg: Registration):
+    # 1. FETCH REGISTRATION (Check both ID types)
+    reg_info = await Registration.objects().where(
+        (Registration.id == target_id) | (Registration.account == target_id)
+    ).prefetch(Registration.account).first().run()
 
+    if not reg_info:
+        raise HTTPException(status_code=404, detail="Helper not found.")
+
+    # 2. SECURITY CHECK
+    is_owner = str(current_reg.id) == str(reg_info.id)
+    is_privileged = current_reg.role in ['admin', 'seeker']
+
+    if not (is_owner or is_privileged):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. You do not have permission to view this profile."
+        )
+
+    helper_id = reg_info.id
+
+    # 3. FETCH PROFILE (Personal or Institutional)
+    profile_details = {}
+    if reg_info.capacity == "personal":
+        profile = await HelperPersonal.objects().where(
+            HelperPersonal.registration == helper_id
+        ).first().run()
+        if profile:
+            profile_details = {
+                "name": profile.name,
+                "age": profile.age,
+                # FIXED: 'gender' is not in HelperPersonal, it's usually in requirements 
+                # or perhaps you intended to use 'faith' or 'languages' here?
+                # I'm removing 'gender' from here to stop the crash.
+                "experience": getattr(profile, 'years_of_experience', None),
+                "city": profile.city,
+                "area": profile.area
+            }
+    else:
+        profile = await HelperInstitutional.objects().where(
+            HelperInstitutional.registration == helper_id
+        ).first().run()
+        if profile:
+            profile_details = {
+                "name": profile.name,
+                "city": profile.city,
+                "address": profile.address
+            }
+
+    # 4. FETCH ALL PREFERENCES
+    h_prefs = await HelperPreference.objects().where(
+        HelperPreference.registration == helper_id
+    ).prefetch(
+        HelperPreference.service,
+        HelperPreference.location, 
+        HelperPreference.work, 
+        HelperPreference.requirements,
+        HelperPreference.helperpreference_details
+    ).run()
+
+    if not h_prefs:
+        return {"registration": reg_info, "profile": profile_details, "preferences": []}
+
+    main_pref = h_prefs[0]
+    services = [{"id": str(p.service.id), "name": p.service.name} for p in h_prefs]
+
+    # 5. CONSTRUCT FULL RESPONSE
+    return {
+        "status": "success",
+        "helper_id": str(helper_id),
+        "account_info": {
+            "phone": reg_info.account.phone,
+            "capacity": reg_info.capacity,
+            "is_active": reg_info.account.is_active # FIXED: table uses 'is_active'
+        },
+        "profile": profile_details,
+        "services": services,
+        "location": {
+            "city": main_pref.location.city if main_pref.location else None,
+            "area": main_pref.location.area if main_pref.location else None
+        },
+        "work_details": {
+            "job_type": main_pref.work.job_type if main_pref.work else None,
+            "work_mode": main_pref.work.work_mode if main_pref.work else None,
+            "working_days": main_pref.work.working_days if main_pref.work else None
+        },
+        "requirements": {
+            "min_salary": main_pref.requirements.min_salary if main_pref.requirements else None,
+            "max_salary": main_pref.requirements.max_salary if main_pref.requirements else None,
+            "gender_pref": main_pref.requirements.gender if main_pref.requirements else None # This is where gender lives
+        },
+        "additional_details": {
+            "skills": main_pref.helperpreference_details.skills if main_pref.helperpreference_details else None,
+            "special_preferences": main_pref.helperpreference_details.special_preferences if main_pref.helperpreference_details else None
+        }
+    }

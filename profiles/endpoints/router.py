@@ -1,7 +1,10 @@
 # profiles/endpoints/router.py
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
-from auth.logic.deps import get_current_account_id
+from auth.logic.deps import get_current_account_id, get_current_registration
+from profiles.logic import profile_service
+from db.tables import Registration
 from profiles.logic.profile_service import get_my_profile, upsert_my_profile
 from profiles.structs.dtos import ProfileOut, ProfileUpsertIn
 
@@ -74,3 +77,43 @@ async def upsert_profile(
     account_id: str = Depends(get_current_account_id),
 ):
     return await upsert_my_profile(account_id=account_id, payload=payload)
+
+
+
+@router.post("/picture")
+async def upload_picture(
+    file: UploadFile = File(...),
+    current_reg: Registration = Depends(get_current_registration)
+):
+    result = await profile_service.save_profile_file_logic(str(current_reg.id), file, mode="post")
+    
+    if result.get("status") == "error":
+        # This will now correctly trigger if the extension is wrong
+        raise HTTPException(status_code=400, detail=result["message"])
+    
+    return FileResponse(
+        path=result["path"],
+        filename=result["filename"],
+        media_type=result["mime_type"],
+        content_disposition_type="inline"
+    )
+
+@router.patch("/picture")
+async def update_picture(
+    file: UploadFile = File(...),
+    current_reg: Registration = Depends(get_current_registration)
+):
+    result = await profile_service.save_profile_file_logic(str(current_reg.id), file, mode="patch")
+    
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result["message"])
+    
+    # return FileResponse(
+    #     path=result["path"],
+    #     filename=result["filename"],
+    #     media_type=result["mime_type"],
+    #     content_disposition_type="inline"
+    # )
+
+
+    return "image is sucessfully updated"

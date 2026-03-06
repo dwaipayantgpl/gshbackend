@@ -1,12 +1,14 @@
 from typing import Any, Dict
 import uuid
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException,status
 
 from auth.logic.deps import get_current_registration, get_current_user_role
 from db.tables import HelperDetails, HelperInstitutional, HelperPersonal, HelperPreference, HelperService, PreferenceLocation, PreferenceRequirements, PreferenceWork, Registration, SeekerPreference, SeekerPreferenceNew
 from seeker.structs.dtos import SeekerPrefCreate
 from piccolo.query.mixins import OnConflict
+from seeker.logic import service
+
 router = APIRouter()
 
 
@@ -319,3 +321,23 @@ async def get_helper_feed(user: Registration = Depends(get_current_registration)
         })
 
     return feed
+
+
+@router.get("/seeker-details/{target_id}")
+async def get_seeker_details_endpoint(
+    target_id: str, 
+    current_reg: Registration = Depends(get_current_registration) 
+):
+    return await service.get_specific_seeker_full_details(target_id, current_reg)
+
+
+ # find the helpers for seeker
+@router.get("/find-my-helpers")
+async def find_my_helpers(user: Registration = Depends(get_current_registration)):
+    # Ensure only seekers can call this
+    if user.role != "seeker":
+        raise HTTPException(status_code=403, detail="Only Seekers can search for Helpers.")
+        
+    return await service.get_matches_for_seeker_logic(user.id)
+        
+    

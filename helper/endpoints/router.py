@@ -1,8 +1,8 @@
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from auth.logic.deps import get_current_account_id, get_current_registration
+from auth.logic.deps import get_current_account_id, get_current_registration, get_current_user_role
 from chat.logic import service
 from helper.logic import service
 from helper.endpoints import router
@@ -10,6 +10,7 @@ from helper.endpoints import router
 from db.tables import HelperService, Registration
 from helper.logic.service import (
     get_preference_by_registration_id,
+    get_specific_helper_full_details,
     list_experience_by_registration_id,
     get_my_preference,
     upsert_my_preference,
@@ -421,3 +422,12 @@ async def get_my_preferences(
 @router.get("/find-my-seekers")
 async def find_my_seekers(user: Registration = Depends(get_current_registration)):
     return await service.get_matches_for_helper_logic(user.id)
+
+#find helpers details using helper id
+# app/routers/helper.py
+@router.get("/helper-details/{target_id}")
+async def get_helper_details_endpoint(
+    target_id: str, 
+    current_reg: Registration = Depends(get_current_registration) 
+):
+    return await service.get_specific_helper_full_details(target_id, current_reg)

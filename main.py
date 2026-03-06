@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from piccolo.engine import engine_finder
 
+from notifications.logic.socket import socket_app
 from auth.endpoints.router import router as auth_router
 from profiles.endpoints.router import router as profiles_router
 from helper.endpoints.router import router as helper_router
@@ -12,6 +13,8 @@ from admin.endpoints.router import router as admin_router
 from complaint.endpoints.router import router as complains_router
 from chat.endpoints.router import router as chat_router
 from seeker.endpoints.router import router as seeker_router
+from bookings.endpoints.router import router as bookings_router
+from notifications.endpoints.router import router as notifications_router
 
 app = FastAPI()
 from dotenv import load_dotenv
@@ -41,7 +44,7 @@ app.add_middleware(
     allow_methods=["*"],          # allow all HTTP methods
     allow_headers=["*"],          # allow all headers
 )
-
+app.mount("/ws", socket_app)
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(profiles_router, prefix="/profiles", tags=["profiles"])
 app.include_router(helper_router, prefix="/helper", tags=["helper"])
@@ -50,3 +53,5 @@ app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(complains_router,prefix="/complaint", tags=["complaint"])
 app.include_router(chat_router,prefix="/chat", tags=["chat"])
 app.include_router(seeker_router,prefix="/seeker", tags=["seeker"])
+app.include_router(bookings_router,prefix="/bookings", tags=["bookings"])
+app.include_router(notifications_router,prefix="/notifications", tags=["notifications"])

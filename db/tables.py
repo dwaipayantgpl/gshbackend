@@ -1,6 +1,9 @@
 # db/tables.py
 import uuid
 from piccolo.table import Table
+from piccolo.columns import ForeignKey, Varchar, Timestamp
+import datetime 
+
 from piccolo.columns import (
     JSONB,
     UUID,
@@ -382,3 +385,33 @@ class HelperPreference(Table):
     class Meta:
         unique_together = (("registration", "service"),)
 
+#-------------------------add profile picture ---------------------
+class ProfilePicture(Table):
+    account = ForeignKey(references=Account, unique=True)
+    file_path = Varchar(length=500)
+    updated_at = Timestamp(auto_now=True)
+
+#-----------------  helper or seeker book ---------------------
+class BookingRequest(Table):
+    id = UUID(primary_key=True, default=uuid.uuid4)
+    seeker = ForeignKey(references=Registration)
+    helper = ForeignKey(references=Registration)
+    service = ForeignKey(references=Service) # The specific service being booked
+    
+    scheduled_start = Timestamptz()
+    scheduled_end = Timestamptz()
+    
+    status = Varchar(length=20,Choice=JOB_APPLICATION_STATUS_CHOICES, default="pending") # pending, accepted, rejected, cancelled
+    
+    address = Text()
+    message = Text(null=True) # "I need you to fix my AC specifically"
+    created_at = Timestamptz(auto_now=True)
+
+class Notifiactions(Table):
+    id = UUID(primary_key=True, default=uuid.uuid4)
+    recipient=ForeignKey(references=Registration)
+    title=Varchar(length=1000)
+    content=Text()
+    booking_id=UUID(null=True)
+    is_read=Boolean(default=False)
+    created_at=Timestamptz(auto_now=True)
