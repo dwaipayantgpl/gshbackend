@@ -1,22 +1,39 @@
 
 from difflib import SequenceMatcher
+import uuid
 
 from fastapi import HTTPException, status
 from db.tables import (
     HelperPersonal, HelperPreference, ProfilePicture, Registration, SeekerPersonal, SeekerInstitutional, 
     SeekerPreferenceNew, Account
 )
+from profiles.logic.profile_service import get_profile_base64_logic
+
 
 async def get_specific_seeker_full_details(target_id: str, current_reg: Registration):
-    # 1. FETCH REGISTRATION (Supports looking up by Registration ID or Account ID)
+    # --- 1. VALIDATE INPUT (Prevents the "undefined" crash) ---
+    try:
+        # Check if target_id is a valid UUID string
+        valid_uuid = uuid.UUID(target_id)
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"Invalid ID format: '{target_id}' is not a valid UUID."
+        )
+
+    # --- 2. FETCH TARGET REGISTRATION ---
+    # Supports looking up by Registration ID or Account ID
     reg_info = await Registration.objects().where(
-        (Registration.id == target_id) | (Registration.account == target_id)
+        (Registration.id == valid_uuid) | (Registration.account == valid_uuid)
     ).prefetch(Registration.account).first().run()
 
     if not reg_info:
-        raise HTTPException(status_code=404, detail="Seeker not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Seeker registration not found."
+        )
 
-    # 2. ROBUST SECURITY CHECK
+    # --- 3. SECURITY & ROLE CHECK ---
     current_user_id = str(current_reg.id)
     target_seeker_id = str(reg_info.id)
     current_role = str(current_reg.role).lower().strip()
@@ -25,16 +42,17 @@ async def get_specific_seeker_full_details(target_id: str, current_reg: Registra
     is_admin = current_role == 'admin'
     is_helper = current_role == 'helper'
 
-    # If none of these conditions are met, block access
+    # Check if ANY of the allowed roles match
     if not (is_owner or is_admin or is_helper):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Access denied. Role '{current_role}' cannot view this profile."
+            detail=f"Access denied. Role '{current_role}' is not authorized to view this profile."
         )
 
+    # Define the seeker_id we are actually querying for
     seeker_id = reg_info.id
 
-    # 3. FETCH PROFILE (Personal or Institutional)
+    # --- 4. FETCH PROFILE (Personal or Institutional) ---
     profile_details = {}
     if reg_info.capacity == "personal":
         profile = await SeekerPersonal.objects().where(
@@ -61,7 +79,7 @@ async def get_specific_seeker_full_details(target_id: str, current_reg: Registra
                 "rating": float(getattr(profile, 'avg_rating', 0.0) or 0.0)
             }
 
-    # 4. FETCH ALL PREFERENCES
+    # --- 5. FETCH PREFERENCES ---
     s_prefs = await SeekerPreferenceNew.objects().where(
         SeekerPreferenceNew.registration == seeker_id
     ).prefetch(
@@ -72,31 +90,36 @@ async def get_specific_seeker_full_details(target_id: str, current_reg: Registra
         SeekerPreferenceNew.helper_details
     ).run()
 
-    # Default structure if no preferences found
+    # --- 6. FETCH PROFILE PICTURE (FOR THE TARGET SEEKER) ---
+    # We use seeker_id, so Admins see the Seeker's photo, not their own.
+    pic_base64 = await get_profile_base64_logic(seeker_id)
+
+    # --- 7. CONSTRUCT FINAL RESPONSE ---
     if not s_prefs:
         return {
             "status": "success",
             "seeker_id": str(seeker_id),
             "account_info": {
                 "phone": reg_info.account.phone,
-                "capacity": reg_info.capacity
+                "capacity": reg_info.capacity,
+                "profile_picture": pic_base64
             },
             "profile": profile_details,
             "preferences": []
         }
 
-    # Grouping logic
+    # Extract main data from the first preference object
     main_pref = s_prefs[0]
-    matched_services = [{"id": str(p.service.id), "name": p.service.name} for p in s_prefs]
+    matched_services = [{"id": str(p.service.id), "name": p.service.name} for p in s_prefs if p.service]
 
-    # 5. CONSTRUCT FINAL RESPONSE
     return {
         "status": "success",
         "seeker_id": str(seeker_id),
         "account_info": {
             "phone": reg_info.account.phone,
             "capacity": reg_info.capacity,
-            "is_active": getattr(reg_info.account, 'is_active', True)
+            "is_active": getattr(reg_info.account, 'is_active', True),
+            "profile_picture": pic_base64
         },
         "profile": profile_details,
         "services_required": matched_services,
@@ -201,7 +224,8 @@ async def get_matches_for_seeker_logic(user_id: str):
             h_profile = await HelperPersonal.objects().where(
                 HelperPersonal.registration == h.registration.id
             ).first().run()
-
+            
+            pic_base64 = await get_profile_base64_logic(user_id)
             grouped_results[h_reg_id] = {
                 "match_details": {
                     "score": f"{round(match_pct)}%",
@@ -210,6 +234,7 @@ async def get_matches_for_seeker_logic(user_id: str):
                 "helper_info": {
                     "registration_id": h_reg_id,
                     "name": h_profile.name if h_profile else "Anonymous Helper",
+                    "profile_pic": pic_base64,
                     "rating": float(h_profile.avg_rating or 0.0) if h_profile else 0.0,
                     "rating_count": h_profile.rating_count if h_profile else 0,
                     "contact_phone": account_record.phone if account_record else None,

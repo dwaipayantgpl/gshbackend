@@ -15,7 +15,7 @@ from chat.endpoints.router import router as chat_router
 from seeker.endpoints.router import router as seeker_router
 from bookings.endpoints.router import router as bookings_router
 from notifications.endpoints.router import router as notifications_router
-
+from ratings.endpoints.router import router as ratings_router
 app = FastAPI()
 from dotenv import load_dotenv
 
@@ -55,3 +55,4 @@ app.include_router(chat_router,prefix="/chat", tags=["chat"])
 app.include_router(seeker_router,prefix="/seeker", tags=["seeker"])
 app.include_router(bookings_router,prefix="/bookings", tags=["bookings"])
 app.include_router(notifications_router,prefix="/notifications", tags=["notifications"])
+app.include_router(ratings_router,prefix="/ratings", tags=["ratings"])

@@ -1,5 +1,6 @@
 # profiles/logic/profile_service.py
 from __future__ import annotations
+import base64
 import os
 import uuid
 from pathlib import Path
@@ -209,3 +210,40 @@ async def save_profile_file_logic(reg_id: str, file: UploadFile, mode: str = "po
 
     except Exception as e:
         return {"status": "error", "message": f"Internal Save Error: {str(e)}"}
+
+
+
+
+async def get_profile_base64_logic(reg_id: str):
+    reg = await Registration.objects().get(Registration.id == reg_id).run()
+    
+    if not reg:
+        return None
+
+
+    record = await ProfilePicture.objects().get(
+        ProfilePicture.account == reg.account
+    ).run()
+
+    if not record or not record.file_path:
+        return None
+    
+
+    full_path = Path(r"C:\CompanyProject\gshbe") / record.file_path
+
+    if not os.path.exists(full_path):
+        print(f"File not found on disk: {full_path}")
+        return None
+
+    try:
+        with open(full_path, "rb") as image_file:
+            binary_data = image_file.read()
+            base64_encoded = base64.b64encode(binary_data).decode('utf-8')
+            
+            ext = os.path.splitext(record.file_path)[1].lower().replace(".", "")
+            mime_type = "image/jpeg" if ext in ["jpg", "jpeg"] else f"image/{ext}"
+            
+            return f"data:{mime_type};base64,{base64_encoded}"
+    except Exception as e:
+        print(f"Error reading profile image file: {e}")
+        return None

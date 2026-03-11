@@ -1,24 +1,45 @@
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 from typing import Optional
 
-class ApplyToHelperSchema(BaseModel):
-    helper_reg_id: UUID
-    service_id: UUID
-    scheduled_start: datetime
-    scheduled_end: datetime
+class BookingSummaryOut(BaseModel):
+    booking_id: UUID
+    helper_name: str
+    service_name: str
+    booking_date: date
+    time_slot: str
     address: str
-    notes: Optional[str] = None
+    total_price: float
+    status: str
 
-    class Config:
-        schema_extra = {
-            "example": {
-                "helper_reg_id": "550e8400-e29b-41d4-a716-446655440000",
-                "service_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-                "scheduled_start": "2026-03-10T09:00:00Z",
-                "scheduled_end": "2026-03-10T12:00:00Z",
-                "address": "123 Main St, New Town",
-                "notes": "Please bring your own cleaning supplies."
-            }
-        }
+class DirectBookingCreate(BaseModel):
+    helper_id: UUID
+    service_id: UUID
+    customer_name: str
+    customer_phone: str
+    customer_email: Optional[str] = None
+    address: str
+    city: str
+    area: str
+    pin_code: str
+    booking_date: date
+    time_slot: str  # Morning, Afternoon, Evening
+    work_details: dict  # JSON for rooms, instructions, etc.
+    duration: Optional[str] = None
+    preferences: Optional[dict] = None
+    payment_method: str
+    total_price: Optional[float] = None
+
+class BookingUpdateSchema(BaseModel):
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    area: Optional[str] = None
+    pin_code: Optional[str] = None
+    booking_date: Optional[date] = None
+    time_slot: Optional[str] = None
+    work_details: Optional[dict] = None
+    duration: Optional[str] = None
+    total_price: Optional[float] = None

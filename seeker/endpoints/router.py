@@ -341,3 +341,12 @@ async def find_my_helpers(user: Registration = Depends(get_current_registration)
     return await service.get_matches_for_seeker_logic(user.id)
         
     
+
+@router.get("/seeker-side details")
+async def find_my_ss(user:Registration=Depends(get_current_registration)):
+    if user.role!="seeker":
+        raise HTTPException(status_code=403)
+    
+    return await service.get_matches_for_seeker_logic()
+
+ 

@@ -1,8 +1,9 @@
 # db/tables.py
 import uuid
-from piccolo.table import Table
-from piccolo.columns import ForeignKey, Varchar, Timestamp
 import datetime 
+import decimal
+from piccolo.table import Table
+import piccolo.columns.choices as choices_module
 
 from piccolo.columns import (
     JSONB,
@@ -14,9 +15,11 @@ from piccolo.columns import (
     Integer,
     Numeric,
     Text,
+    Timestamp,
+    Date
 )
+# This is the correct way to import Choice
 from piccolo.columns.choices import Choice
-
 # ---------- Choice sets (enums) ----------
 
 ROLE_CHOICES = [
@@ -392,26 +395,65 @@ class ProfilePicture(Table):
     updated_at = Timestamp(auto_now=True)
 
 #-----------------  helper or seeker book ---------------------
-class BookingRequest(Table):
+class ServiceBooking(Table):
+    """
+    Comprehensive table for the 9-step booking flow.
+    """
+    id = UUID(primary_key=True, default=uuid.uuid4)
+    seeker = ForeignKey(references=Registration)
+    customer_name = Varchar(length=100)
+    customer_phone = Varchar(length=20)
+    customer_email = Varchar(length=100, null=True)
+    address = Text(null=True)
+    city = Varchar(length=100)
+    area = Varchar(length=100)
+    pin_code = Varchar(length=10)
+    service = ForeignKey(references=Service)
+    helper = ForeignKey(references=Registration) 
+
+    booking_date = Date()
+    time_slot = Varchar(length=20) # Morning, Afternoon, Evening
+
+    work_details = JSONB()
+
+    duration = Varchar(length=50,null=True) # e.g., "4 Hours", "Full Day", "Monthly"
+
+    preferences = JSONB(null=True)
+
+    payment_method = Varchar(length=30) # UPI, Cash, Card
+    total_price = Numeric(
+        precision=10, 
+        scale=2, 
+        default=decimal.Decimal("0.00"), 
+        null=True
+    )
+    status = Varchar(length=20, default="pending")
+    created_at = Timestamptz(auto_now=True)
+
+
+class Notifiactions(Table): 
+    id = UUID(primary_key=True, default=uuid.uuid4)
+    recipient = ForeignKey(references=Registration)
+    title = Varchar(length=1000)
+    content = Text()
+    booking_id = UUID(null=True)
+    is_read = Boolean(default=False)
+    created_at = Timestamptz(auto_now=True)
+
+# ------------------- CHAT SYSTEM -----------
+class ChatMessage(Table):
+    id = UUID(primary_key=True, default=uuid.uuid4)
+    service = ForeignKey(references=Service)
+    sender = ForeignKey(references=Registration) # Who sent it?
+    message = Text()
+    timestamp = Timestamptz(auto_now=True)
+    is_read = Boolean(default=False)
+
+#-------------------  RATINGS ---------------------
+class Review(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
     seeker = ForeignKey(references=Registration)
     helper = ForeignKey(references=Registration)
-    service = ForeignKey(references=Service) # The specific service being booked
-    
-    scheduled_start = Timestamptz()
-    scheduled_end = Timestamptz()
-    
-    status = Varchar(length=20,Choice=JOB_APPLICATION_STATUS_CHOICES, default="pending") # pending, accepted, rejected, cancelled
-    
-    address = Text()
-    message = Text(null=True) # "I need you to fix my AC specifically"
+    rating = Integer() 
+    comment = Text(null=True)
     created_at = Timestamptz(auto_now=True)
-
-class Notifiactions(Table):
-    id = UUID(primary_key=True, default=uuid.uuid4)
-    recipient=ForeignKey(references=Registration)
-    title=Varchar(length=1000)
-    content=Text()
-    booking_id=UUID(null=True)
-    is_read=Boolean(default=False)
-    created_at=Timestamptz(auto_now=True)

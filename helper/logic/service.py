@@ -20,6 +20,7 @@ from db.tables import (
     SeekerPreferenceNew,
     Service,
 )
+from profiles.logic.profile_service import get_profile_base64_logic
 
 
 # ----------------------------
@@ -549,6 +550,7 @@ async def get_matches_for_helper_logic(user_id: str):
                 if s_profile and s_profile.phone:
                     contact_phone = s_profile.phone
 
+            pic_base64 = await get_profile_base64_logic(s.registration.id)
             # Store the data in the dictionary
             grouped_results[s_reg_id] = {
                 "match_details": {
@@ -559,6 +561,7 @@ async def get_matches_for_helper_logic(user_id: str):
                     "registration_id": s_reg_id,
                     "capacity": s.registration.capacity,
                     "name": s_profile.name if s_profile else "Anonymous Seeker",
+                    "profile_pic": pic_base64,
                     "rating": float(s_profile.avg_rating or 0.0),
                     "rating_count": s_profile.rating_count if s_profile else 0,
                     "institution_type": getattr(s_profile, 'institution_type', None) if s.registration.capacity == 'institutional' else None,
@@ -654,7 +657,8 @@ async def get_specific_helper_full_details(target_id: str, current_reg: Registra
 
     main_pref = h_prefs[0]
     services = [{"id": str(p.service.id), "name": p.service.name} for p in h_prefs]
-
+    
+    base64_pic=await get_profile_base64_logic(current_reg.id)
     # 5. CONSTRUCT FULL RESPONSE
     return {
         "status": "success",
@@ -662,7 +666,9 @@ async def get_specific_helper_full_details(target_id: str, current_reg: Registra
         "account_info": {
             "phone": reg_info.account.phone,
             "capacity": reg_info.capacity,
-            "is_active": reg_info.account.is_active # FIXED: table uses 'is_active'
+            "is_active": reg_info.account.is_active, # FIXED: table uses 'is_active',
+            "profile_picture":base64_pic
+
         },
         "profile": profile_details,
         "services": services,

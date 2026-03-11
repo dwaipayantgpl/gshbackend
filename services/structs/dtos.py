@@ -41,7 +41,9 @@ class UserReportOut(BaseModel):
 
 class UserReportDetail(BaseModel):
     account_id: str
+    registration_id:str
     phone: str
+    profile_picture: Optional[str] = None
     role: str
     capacity: str
     is_active: bool

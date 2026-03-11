@@ -1,8 +1,8 @@
 # services/endpoints/router.py
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status # Fixed imports
-from auth.logic.deps import get_current_account_id, require_admin
-from db.tables import Service # Use consistent path
+from auth.logic.deps import get_current_account_id, get_current_registration, require_admin
+from db.tables import Registration, Service # Use consistent path
 from services.logic import service_logic
 from services.structs.dtos import AdminDashboardOut, DateRangeIn, ServiceCreateIn, ServiceOut, ServiceUpdateIn
 
@@ -69,16 +69,16 @@ async def list_services():
     return await Service.objects().order_by(Service.name)
 
 #user report
-@router.get("/admin/user-report", response_model=AdminDashboardOut, summary="Admin: Get all Helper/Seeker details")
+@router.get("/admin/user-report", response_model=AdminDashboardOut, summary="Get all Helper/Seeker details")
 async def admin_user_report(
-    _admin: str = Depends(require_admin)
+    # Remove 'require_admin' so everyone can access
+    current_user: Registration = Depends(get_current_registration) 
 ):
     """
-    Returns total counts and a detailed list of every helper and seeker 
-    with their phone numbers and names.
+    Accessible by all roles. Returns total counts and a detailed list 
+    of every helper and seeker with names, phone numbers, and profile pictures.
     """
-    return await service_logic.get_admin_user_report() 
-
+    return await service_logic.get_admin_user_report()
 #check total head count between two specific dates
 @router.post("/admin/analytics/range-report", summary="Admin: Growth between two dates")
 async def get_range_report(
@@ -89,3 +89,15 @@ async def get_range_report(
         payload.start_date, 
         payload.end_date
     )
+
+
+@router.get("/service-participants/{service_id}")
+async def get_service_participants(
+    service_id: str,
+    current_user: Registration = Depends(get_current_registration)
+):
+    """
+    Returns all Helpers and Seekers registered for a specific service ID,
+    including their names, contact info, and profile pictures.
+    """
+    return await service_logic.get_service_participants_logic(service_id)

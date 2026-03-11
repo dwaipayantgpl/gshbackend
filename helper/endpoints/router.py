@@ -431,3 +431,5 @@ async def get_helper_details_endpoint(
     current_reg: Registration = Depends(get_current_registration) 
 ):
     return await service.get_specific_helper_full_details(target_id, current_reg)
+
+
