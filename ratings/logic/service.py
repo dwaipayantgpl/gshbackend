@@ -2,18 +2,23 @@ from http.client import HTTPException
 
 from db.tables import Review, SeekerInstitutional, SeekerPersonal
 from piccolo.query.functions.aggregate import Avg
-async def add_review_logic(seeker_id: str, helper_id: str, rating: int, comment: str = None):
-    if not (1 <= rating <= 5):
-        raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
-    
+
+
+async def add_review_logic(seeker_id: str, helper_id: str, booking_id: str, rating: int, comment: str = None):
+    existing_review = await Review.objects().where(Review.booking == booking_id).first().run()
+    if existing_review:
+        raise HTTPException(status_code=400, detail="This booking has already been rated.")
+
     new_review = Review(
+        booking=booking_id,  
         seeker=seeker_id,
         helper=helper_id,
         rating=rating,
         comment=comment
     )
     await new_review.save()
-    return {"message": "Review submitted successfully"}
+    #return {"message": "Rating submitted successfully for this booking."}
+    return new_review
 
 
 # For Seeker: "Who have I rated?"
@@ -31,19 +36,30 @@ async def get_helper_reviews_received(helper_id: str):
 
 
 async def get_helper_overall_rating(helper_id: str):
-    # Calculate the average of the rating column
+    # 1. Calculate Average
     result = await Review.select(Avg(Review.rating)).where(Review.helper == helper_id).run()
-    
-    # Piccolo returns a list; extract the average
     avg_rating = result[0]['avg'] if result and result[0]['avg'] else 0
     
-    # Count total reviews
+    # 2. Total Count
     total_reviews = await Review.count().where(Review.helper == helper_id).run()
     
+    # 3. (Optional) Get individual star counts for a progress bar UI
+    # This helps frontend show: 5 stars (10), 4 stars (2), etc.
+    star_breakdown = {}
+    for star in range(1, 6):
+        count = await Review.count().where(
+            (Review.helper == helper_id) & (Review.rating == star)
+        ).run()
+        star_breakdown[f"{star}_star"] = count
+
     return {
+        "helper_id": helper_id,
         "overall_rating": round(float(avg_rating), 1),
-        "total_reviews": total_reviews
+        "total_reviews": total_reviews,
+        "star_breakdown": star_breakdown
     }
+
+
 
 # Update to your get_seeker_reviews_given logic
 async def get_seeker_reviews_given(seeker_id: str):
@@ -86,3 +102,20 @@ async def get_helper_reviews_with_names(helper_id: str):
         })
 
     return results
+
+
+# ratings by booking id
+async def get_review_by_booking_logic(booking_id: str):
+    # Fetch review and join with related names
+    review = await Review.objects().where(
+        Review.booking == booking_id
+    ).prefetch(
+        Review.seeker, 
+        Review.helper
+    ).first().run()
+
+    if not review:
+        return None
+        
+    return review
+

@@ -7,6 +7,7 @@ from db.tables import HelperInstitutional, HelperPersonal, HelperPreference, Hel
 import uuid
 
 from profiles.logic.profile_service import get_profile_base64_logic
+from ratings.logic.service import get_helper_overall_rating
 
 async def update_existing_service(service_id: str, data: dict):
     service = await Service.objects().where(Service.id == service_id).first()
@@ -86,12 +87,19 @@ async def _encode_image_from_path(relative_path: str) -> str | None:
         # Silently fail and return None if file is corrupted or unreadable
         return None
 
+# C:\CompanyProject\gshbe\admin\logic\service.py
+
 async def get_admin_user_report():
     # 1. Fetch aggregate counts
-    helpers_count = await Registration.count().where(Registration.role.is_in(['helper', 'both'])).run()
-    seekers_count = await Registration.count().where(Registration.role.is_in(['seeker', 'both'])).run()
+    helpers_count = await Registration.count().where(
+        Registration.role.is_in(['helper', 'both'])
+    ).run()
+    
+    seekers_count = await Registration.count().where(
+        Registration.role.is_in(['seeker', 'both'])
+    ).run()
 
-    # 2. Fetch Registration joined with Account for core data
+    # 2. Fetch all Registration records with Account details
     raw_data = await Registration.select(
         Registration.account.id,
         Registration.account.phone,
@@ -101,60 +109,73 @@ async def get_admin_user_report():
         Registration.id
     ).run()
 
-    # --- BATCH FETCH PROFILE PICTURE RECORDS ---
-    account_ids = [item["account.id"] for item in raw_data]
+    # --- BATCH FETCH PROFILE PICTURE PATHS ---
+    acc_ids = [item["account.id"] for item in raw_data]
     all_pics = await ProfilePicture.objects().where(
-        ProfilePicture.account.is_in(account_ids)
+        ProfilePicture.account.is_in(acc_ids)
     ).run()
-    
-    # Map account_id to the file_path for O(1) lookup
     pic_map = {str(p.account): p.file_path for p in all_pics}
 
     user_list = []
 
+    # 3. LOOP THROUGH USERS AND ENRICH DATA
     for item in raw_data:
-        reg_id = item["id"]
-        acc_id = str(item["account.id"])
+        reg_id_str = str(item["id"])
+        acc_id_str = str(item["account.id"])
         role = item["role"]
         capacity = item["capacity"]
-        
-        # 3. Dynamic Profile Lookup based on user role and capacity
-        profile = None
-        if role == 'helper':
-            table = HelperPersonal if capacity == 'personal' else HelperInstitutional
-            profile = await table.objects().where(table.registration == reg_id).first().run()
-        elif role == 'seeker':
-            table = SeekerPersonal if capacity == 'personal' else SeekerInstitutional
-            profile = await table.objects().where(table.registration == reg_id).first().run()
 
-        # 4. Resolve Profile Picture
-        # Look up path in map and convert to base64
-        file_path = pic_map.get(acc_id)
+
+        rating_stats = await get_helper_overall_rating(reg_id_str)
+
+        assigned_services = []
+        if role in ['helper', 'both']:
+            # We fetch service names linked to this specific helper
+            pref_data = await HelperPreference.select(
+                HelperPreference.service.name.as_alias("s_name")
+            ).where(HelperPreference.registration == reg_id_str).run()
+            assigned_services = [s["s_name"] for s in pref_data]
+
+        # C. Dynamic Profile Lookup (Personal vs Institutional)
+        profile = None
+        if role in ['helper', 'both']:
+            table = HelperPersonal if capacity == 'personal' else HelperInstitutional
+            profile = await table.objects().where(table.registration == reg_id_str).first().run()
+        else:
+            table = SeekerPersonal if capacity == 'personal' else SeekerInstitutional
+            profile = await table.objects().where(table.registration == reg_id_str).first().run()
+
+        # D. Resolve Profile Picture to Base64
+        file_path = pic_map.get(acc_id_str)
         encoded_pic = await _encode_image_from_path(file_path) if file_path else None
 
-        # 5. Construct the record
+        # E. Add to the final report list
         user_list.append({
-            "account_id": acc_id,
-            "registration_id": str(reg_id),
-            "phone": item["account.phone"],
-            "profile_picture": encoded_pic,
-            "role": role,
-            "capacity": capacity,
-            "is_active": item["account.is_active"],
+            "registration_id": reg_id_str,
             "name": getattr(profile, 'name', 'N/A') if profile else "N/A",
-            "city": getattr(profile, 'city', 'N/A') if profile else "N/A",
-            "area": getattr(profile, 'area', 'N/A') if profile else "N/A"
+            "role": role,
+            "phone": item["account.phone"],
+            "is_active": item["account.is_active"],
+            "profile_picture": encoded_pic,
+            "rating": rating_stats,  # Reused from get_helper_overall_rating
+            "allocated_services": assigned_services,
+            "location": {
+                "city": getattr(profile, 'city', 'N/A') if profile else "N/A",
+                "area": getattr(profile, 'area', 'N/A') if hasattr(profile, 'area') else "N/A"
+            }
         })
 
     return {
-        "total_helpers": helpers_count,
-        "total_seekers": seekers_count,
+        "status": "success",
+        "summary": {
+            "total_helpers": helpers_count,
+            "total_seekers": seekers_count,
+            "total_users": len(user_list)
+        },
         "users": user_list
     }
 
 async def get_growth_by_date(start: date, end: date):
-    # Filter Registration table by the date the linked Account was created
-    # We use >= for start and <= for end
     
     helpers = await Registration.count().where(
         (Registration.role == 'helper') &
@@ -241,3 +262,6 @@ async def get_service_participants_logic(service_id: str):
         "helpers": helpers_list,
         "seekers": seekers_list
     }
+
+async def create_service():
+    SeekerPersonal.avg_rating="check that evey element"

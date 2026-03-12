@@ -443,17 +443,25 @@ class Notifiactions(Table):
 # ------------------- CHAT SYSTEM -----------
 class ChatMessage(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
-    service = ForeignKey(references=Service)
-    sender = ForeignKey(references=Registration) # Who sent it?
+    booking = ForeignKey(references=ServiceBooking) 
+    sender = ForeignKey(references=Registration)
     message = Text()
-    timestamp = Timestamptz(auto_now=True)
+    created_at = Timestamptz(auto_now=True)
     is_read = Boolean(default=False)
 
 #-------------------  RATINGS ---------------------
 class Review(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
+    booking = ForeignKey(references=ServiceBooking)
     seeker = ForeignKey(references=Registration)
     helper = ForeignKey(references=Registration)
     rating = Integer() 
     comment = Text(null=True)
+    created_at = Timestamptz(auto_now=True)
+
+# ----------- FAQ ------------------
+class FAQ(Table):
+    id = UUID(primary_key=True, default=uuid.uuid4)
+    question = Text(required=True)
+    answer = Text(required=True)
     created_at = Timestamptz(auto_now=True)

@@ -3,20 +3,24 @@ from fastapi import APIRouter, Body, Depends
 from auth.logic.deps import get_current_registration
 from bookings.logic import service
 router = APIRouter()
-# bookings/endpoints/chat_router.py
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from chat.logic.chat_manager import manager
 from db.tables import ChatMessage, Registration
-
 @router.websocket("/ws/chat/{booking_id}/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, booking_id: str, user_id: str):
-    await manager.connect(websocket, booking_id)
+    # Retrieve user for role check (you might pass token instead for better security)
+    user = await Registration.objects().get(Registration.id == user_id).run()
+    
     try:
+        # Validate permission before connecting
+        await service.validate_chat_permission(booking_id, user_id, user.role)
+        
+        await manager.connect(websocket, booking_id)
+        
         while True:
-            # Receive message from Seeker or Helper
             data = await websocket.receive_text()
             
-            # 1. Save to Database instantly
+            # Save to DB
             new_msg = ChatMessage(
                 booking=booking_id,
                 sender=user_id,
@@ -24,19 +28,18 @@ async def websocket_endpoint(websocket: WebSocket, booking_id: str, user_id: str
             )
             await new_msg.save()
 
-            # 2. Broadcast to everyone in the "Match Room"
-            payload = {
+            # Broadcast
+            await manager.broadcast_to_room(booking_id, {
                 "sender_id": user_id,
                 "message": data,
                 "timestamp": str(new_msg.created_at)
-            }
-            await manager.broadcast_to_room(booking_id, payload)
+            })
             
-    except WebSocketDisconnect:
+    except Exception as e:
+        print(f"Connection Error: {e}")
         manager.disconnect(websocket, booking_id)
 
 
-# bookings/endpoints/chat_router.py
 
 @router.get("/chat/history/{booking_id}")
 async def get_chat_history(

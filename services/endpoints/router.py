@@ -69,16 +69,16 @@ async def list_services():
     return await Service.objects().order_by(Service.name)
 
 #user report
-@router.get("/admin/user-report", response_model=AdminDashboardOut, summary="Get all Helper/Seeker details")
-async def admin_user_report(
-    # Remove 'require_admin' so everyone can access
-    current_user: Registration = Depends(get_current_registration) 
-):
+# C:\CompanyProject\gshbe\admin\endpoints\router.py
+
+@router.get("/admin/user-report", summary="Get all Helper/Seeker details - PUBLIC")
+async def admin_user_report():
     """
-    Accessible by all roles. Returns total counts and a detailed list 
-    of every helper and seeker with names, phone numbers, and profile pictures.
+    PUBLIC ACCESS. Returns total counts and a detailed list 
+    of every helper and seeker. No token required.
     """
     return await service_logic.get_admin_user_report()
+
 #check total head count between two specific dates
 @router.post("/admin/analytics/range-report", summary="Admin: Growth between two dates")
 async def get_range_report(

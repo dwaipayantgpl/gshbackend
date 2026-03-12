@@ -3,7 +3,7 @@ from uuid import UUID
 import uuid
 from fastapi import HTTPException
 
-from db.tables import  HelperPersonal, Registration, SeekerInstitutional, SeekerPersonal, Service, ServiceBooking
+from db.tables import  HelperInstitutional, HelperPersonal, Registration, SeekerInstitutional, SeekerPersonal, Service, ServiceBooking
 from notifications.logic.service import NotificationService
 from profiles.logic.profile_service import get_profile_base64_logic
 
@@ -82,6 +82,43 @@ async def update_seeker_booking_logic(booking_id: UUID, seeker_id: str, data: di
     return {"message": "Booking updated successfully", "booking_id": str(booking.id)}
 
 
+# async def get_seeker_bookings_logic(seeker_id: str):
+#     # 1. Fetch bookings with service name and helper_id
+#     bookings = await ServiceBooking.select(
+#         ServiceBooking.all_columns(),
+#         ServiceBooking.service.name.as_alias("service_name"),
+#         ServiceBooking.helper.id.as_alias("helper_reg_id") 
+#     ).where(
+#         ServiceBooking.seeker == seeker_id
+#     ).order_by(
+#         ServiceBooking.created_at, ascending=False
+#     ).run()
+
+#     if not bookings:
+#         return []
+
+#     # 2. Collect all unique helper registration IDs from the bookings
+#     helper_ids = list(set([b["helper_reg_id"] for b in bookings]))
+
+#     # 3. Batch fetch names from HelperPersonal table
+#     # (Assuming most helpers are 'personal'. If you use both, you'd check HelperInstitutional too)
+#     helper_profiles = await HelperPersonal.select(
+#         HelperPersonal.registration,
+#         HelperPersonal.name
+#     ).where(
+#         HelperPersonal.registration.is_in(helper_ids)
+#     ).run()
+
+#     # Create a mapping for O(1) lookup: { "reg_id": "Name" }
+#     name_map = {str(p["registration"]): p["name"] for p in helper_profiles}
+
+#     # 4. Attach the names to the booking objects
+#     for b in bookings:
+#         b["helper_name"] = name_map.get(str(b["helper_reg_id"]), "Unknown Helper")
+
+#     return bookings
+
+
 async def get_seeker_bookings_logic(seeker_id: str):
     # 1. Fetch bookings with service name and helper_id
     bookings = await ServiceBooking.select(
@@ -97,24 +134,46 @@ async def get_seeker_bookings_logic(seeker_id: str):
     if not bookings:
         return []
 
-    # 2. Collect all unique helper registration IDs from the bookings
+    # 2. Collect unique helper IDs
     helper_ids = list(set([b["helper_reg_id"] for b in bookings]))
 
-    # 3. Batch fetch names from HelperPersonal table
-    # (Assuming most helpers are 'personal'. If you use both, you'd check HelperInstitutional too)
-    helper_profiles = await HelperPersonal.select(
+    # 3. Batch fetch from BOTH Personal and Institutional tables
+    # Personal helpers usually have City/Area
+    personal_data = await HelperPersonal.select(
         HelperPersonal.registration,
-        HelperPersonal.name
-    ).where(
-        HelperPersonal.registration.is_in(helper_ids)
-    ).run()
+        HelperPersonal.name,
+        HelperPersonal.city,
+        HelperPersonal.area
+    ).where(HelperPersonal.registration.is_in(helper_ids)).run()
 
-    # Create a mapping for O(1) lookup: { "reg_id": "Name" }
-    name_map = {str(p["registration"]): p["name"] for p in helper_profiles}
+    # Institutional helpers usually have a full Address
+    institutional_data = await HelperInstitutional.select(
+        HelperInstitutional.registration,
+        HelperInstitutional.name,
+        HelperInstitutional.city,
+        HelperInstitutional.address
+    ).where(HelperInstitutional.registration.is_in(helper_ids)).run()
 
-    # 4. Attach the names to the booking objects
+    # Create a unified mapping: { "reg_id": {"name": "...", "address": "..."} }
+    helper_info_map = {}
+
+    for p in personal_data:
+        reg_id = str(p["registration"])
+        # Format address as "City, Area" for personal helpers
+        address_str = f"{p['city']}, {p['area']}" if p['city'] and p['area'] else (p['city'] or p['area'] or "Address not provided")
+        helper_info_map[reg_id] = {"name": p["name"], "address": address_str}
+
+    for i in institutional_data:
+        reg_id = str(i["registration"])
+        # Format address as "Full Address, City" for institutions
+        address_str = f"{i['address']}, {i['city']}" if i['address'] and i['city'] else (i['address'] or i['city'] or "Address not provided")
+        helper_info_map[reg_id] = {"name": i["name"], "address": address_str}
+
+    # 4. Attach the names and addresses to the booking objects
     for b in bookings:
-        b["helper_name"] = name_map.get(str(b["helper_reg_id"]), "Unknown Helper")
+        info = helper_info_map.get(str(b["helper_reg_id"]), {})
+        b["helper_name"] = info.get("name", "Unknown Helper")
+        b["helper_address"] = info.get("address", "N/A")
 
     return bookings
 

@@ -21,6 +21,7 @@ from db.tables import (
     Service,
 )
 from profiles.logic.profile_service import get_profile_base64_logic
+from ratings.logic.service import get_helper_overall_rating
 
 
 # ----------------------------
@@ -612,7 +613,7 @@ async def get_specific_helper_full_details(target_id: str, current_reg: Registra
         )
 
     helper_id = reg_info.id
-
+    rating_stats = await get_helper_overall_rating(str(helper_id))
     # 3. FETCH PROFILE (Personal or Institutional)
     profile_details = {}
     if reg_info.capacity == "personal":
@@ -667,8 +668,8 @@ async def get_specific_helper_full_details(target_id: str, current_reg: Registra
             "phone": reg_info.account.phone,
             "capacity": reg_info.capacity,
             "is_active": reg_info.account.is_active, # FIXED: table uses 'is_active',
-            "profile_picture":base64_pic
-
+            "profile_picture":base64_pic,
+            "rating_stats": rating_stats
         },
         "profile": profile_details,
         "services": services,
