@@ -320,18 +320,7 @@ class BlockedUser(Table):
     blocked_at = Timestamptz(auto_now=True)
 
 
-# ---------- Complaint Table ----------
-class Complaint(Table):
-    """
-    User submitted issues/complaints.
-    """
-    id = UUID(primary_key=True, default=uuid.uuid4)
-    account = ForeignKey(references=Account)
-    subject = Varchar(length=100)
-    description = Text()
-    status = Varchar(length=20, choices=COMPLAINT_STATUS_CHOICES, default="pending")
-    admin_note = Text(null=True)  # Added to store admin's reasoning
-    created_at = Timestamptz(auto_now=True)
+
 
 # ---------- seeker Helper preferences ----------
 class PreferenceLocation(Table):
@@ -464,4 +453,17 @@ class FAQ(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
     question = Text(required=True)
     answer = Text(required=True)
+    target_role = Varchar(length=20, default='both') 
+    created_at = Timestamptz(auto_now=True)
+    
+
+# ---------- Complaint Table ----------
+class Complaint(Table):
+    id = UUID(primary_key=True, default=uuid.uuid4)
+    account_id = ForeignKey(references=Account)
+    booking_id = ForeignKey(references=ServiceBooking, null=True)
+    category = Varchar(length=50) 
+    description = Text()
+    proof_image = Text(null=True)
+    status = Varchar(length=20, choices=COMPLAINT_STATUS_CHOICES, default="pending")
     created_at = Timestamptz(auto_now=True)

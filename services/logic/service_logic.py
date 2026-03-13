@@ -101,12 +101,12 @@ async def get_admin_user_report():
 
     # 2. Fetch all Registration records with Account details
     raw_data = await Registration.select(
-        Registration.account.id,
+        Registration.account.id,      # This is the account_id
         Registration.account.phone,
         Registration.account.is_active,
         Registration.role,
         Registration.capacity,
-        Registration.id
+        Registration.id               # This is the registration_id
     ).run()
 
     # --- BATCH FETCH PROFILE PICTURE PATHS ---
@@ -121,22 +121,20 @@ async def get_admin_user_report():
     # 3. LOOP THROUGH USERS AND ENRICH DATA
     for item in raw_data:
         reg_id_str = str(item["id"])
-        acc_id_str = str(item["account.id"])
+        acc_id_str = str(item["account.id"]) # Extracted here
         role = item["role"]
         capacity = item["capacity"]
-
 
         rating_stats = await get_helper_overall_rating(reg_id_str)
 
         assigned_services = []
         if role in ['helper', 'both']:
-            # We fetch service names linked to this specific helper
             pref_data = await HelperPreference.select(
                 HelperPreference.service.name.as_alias("s_name")
             ).where(HelperPreference.registration == reg_id_str).run()
             assigned_services = [s["s_name"] for s in pref_data]
 
-        # C. Dynamic Profile Lookup (Personal vs Institutional)
+        # Dynamic Profile Lookup
         profile = None
         if role in ['helper', 'both']:
             table = HelperPersonal if capacity == 'personal' else HelperInstitutional
@@ -145,19 +143,19 @@ async def get_admin_user_report():
             table = SeekerPersonal if capacity == 'personal' else SeekerInstitutional
             profile = await table.objects().where(table.registration == reg_id_str).first().run()
 
-        # D. Resolve Profile Picture to Base64
         file_path = pic_map.get(acc_id_str)
         encoded_pic = await _encode_image_from_path(file_path) if file_path else None
 
-        # E. Add to the final report list
+        # 4. Add to the final report list
         user_list.append({
+            "account_id": acc_id_str,        # <--- NEW FIELD ADDED
             "registration_id": reg_id_str,
             "name": getattr(profile, 'name', 'N/A') if profile else "N/A",
             "role": role,
             "phone": item["account.phone"],
             "is_active": item["account.is_active"],
             "profile_picture": encoded_pic,
-            "rating": rating_stats,  # Reused from get_helper_overall_rating
+            "rating": rating_stats,
             "allocated_services": assigned_services,
             "location": {
                 "city": getattr(profile, 'city', 'N/A') if profile else "N/A",
