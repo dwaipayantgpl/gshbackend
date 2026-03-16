@@ -6,7 +6,7 @@ class ChatManager:
         self.active_connections: Dict[str, List[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, booking_id: str):
-        await websocket.accept()
+        #await websocket.accept()
         if booking_id not in self.active_connections:
             self.active_connections[booking_id] = []
         self.active_connections[booking_id].append(websocket)
@@ -24,4 +24,3 @@ class ChatManager:
             for connection in self.active_connections[booking_id]:
                 await connection.send_json(message)
 
-manager = ChatManager()

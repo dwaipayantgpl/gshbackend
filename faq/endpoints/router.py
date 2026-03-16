@@ -15,9 +15,7 @@ async def get_user_faqs(current_user = Depends(get_current_registration)):
 
 # 2. GET ALL (Admin view to see all management)
 @router.get("/admin/all")
-async def get_all_faqs_admin(current_user = Depends(get_current_registration)):
-    if current_user.role != 'admin':
-        raise HTTPException(status_code=403)
+async def get_all_faqs_admin():
     return await service.admin_get_all_faqs()
 
 # 3. POST (Admin Only)

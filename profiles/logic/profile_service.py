@@ -84,6 +84,7 @@ async def get_my_profile(*, account_id: str) -> ProfileOut:
     if not meta:
         # Should never happen unless role/capacity got new values
         return ProfileOut(
+            account_id=str(reg.account),
             registration_id=str(reg.id),
             role=reg.role,
             phone=phoneno,
@@ -96,6 +97,7 @@ async def get_my_profile(*, account_id: str) -> ProfileOut:
     row = await table.objects().where(table.registration == reg.id).first()
 
     return ProfileOut(
+        account_id=str(reg.account),
         registration_id=str(reg.id),
         role=reg.role,
         phone=phoneno,
@@ -129,6 +131,7 @@ async def upsert_my_profile(*, account_id: str, payload: ProfileUpsertIn) -> Pro
         await row.save()
 
     return ProfileOut(
+        account_id=str(account_id),
         registration_id=str(reg.id),
         role=reg.role,
         phone=phoneno,

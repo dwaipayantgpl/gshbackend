@@ -64,6 +64,7 @@ ProfileUpsertIn = Annotated[
 # ----------------------------
 
 class ProfileOut(BaseModel):
+    account_id: Optional[str] = None
     registration_id: str
     role: str
     phone:str

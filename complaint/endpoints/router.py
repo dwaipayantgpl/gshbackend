@@ -106,3 +106,16 @@ async def get_complaint_history(
         raise HTTPException(status_code=400, detail=result["message"])
         
     return result
+
+
+@router.delete("/{complaint_id}", tags=["Admin Complaints"])
+async def remove_complaint(
+    complaint_id: str, 
+    _admin: str = Depends(require_admin) # Only allows access if token is admin
+):
+    result = await service.delete_resolved_complaint(complaint_id)
+    
+    if result["status"] == "error":
+        raise HTTPException(status_code=400, detail=result["message"])
+        
+    return result

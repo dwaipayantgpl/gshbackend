@@ -73,40 +73,37 @@ async def get_service_deep_analytics():
     report = []
 
     for s in all_services:
-        # --- 1. FETCH HELPERS ---
-        # We use objects().prefetch() to get the related Preference and Registration data
-        helpers_query = await HelperService.objects().where(
-            HelperService.service == s.id
+        # --- 1. FETCH HELPERS (via HelperPreference) ---
+        # We prefetch 'work' to get the job_type (shift)
+        helpers_query = await HelperPreference.objects().where(
+            HelperPreference.service == s.id
         ).prefetch(
-            HelperService.helper,
-            HelperService.helper.account
+            HelperPreference.registration,
+            HelperPreference.registration.account,
+            HelperPreference.work
         ).run()
 
         detailed_helpers = []
-        for hs in helpers_query:
-            h_reg = hs.helper
-            h_id = h_reg.id
-            cap = h_reg.capacity
-            phone = h_reg.account.phone if h_reg.account else "N/A"
-
-            # Fetch name
+        for hp in helpers_query:
+            reg = hp.registration
+            if not reg: continue
+            
+            # Name fetching logic
             name = "Unknown"
-            ProfileTable = HelperPersonal if cap == 'personal' else HelperInstitutional
-            profile = await ProfileTable.objects().where(ProfileTable.registration == h_id).first().run()
+            ProfileTable = HelperPersonal if reg.capacity == 'personal' else HelperInstitutional
+            profile = await ProfileTable.objects().where(
+                ProfileTable.registration == reg.id
+            ).first().run()
             if profile: name = profile.name
-
-            # Fetch shift (Preference)
-            pref = await HelperPreference.objects().where(HelperPreference.registration == h_id).first().run()
-            shift = pref.job_type if pref else "not_specified"
 
             detailed_helpers.append({
                 "name": name,
-                "phone": phone,
-                "capacity": cap,
-                "shift": shift
+                "phone": reg.account.phone if reg.account else "N/A",
+                "capacity": reg.capacity,
+                "shift": hp.work.job_type if hp.work else "not_specified"
             })
 
-        # --- 2. FETCH SEEKERS ---
+        # --- 2. FETCH SEEKERS (via SeekerPreferenceNew) ---
         seekers_query = await SeekerPreferenceNew.objects().where(
             SeekerPreferenceNew.service == s.id
         ).prefetch(
@@ -116,25 +113,26 @@ async def get_service_deep_analytics():
         ).run()
 
         detailed_seekers = []
-        for sk in seekers_query:
-            sk_reg = sk.registration
-            sk_id = sk_reg.id
-            cap = sk_reg.capacity
-            phone = sk_reg.account.phone if sk_reg.account else "N/A"
-            shift = sk.work.job_type if sk.work else "not_specified"
+        for sp in seekers_query:
+            reg = sp.registration
+            if not reg: continue
 
+            # Name fetching logic
             name = "Unknown"
-            ProfileTable = SeekerPersonal if cap == 'personal' else SeekerInstitutional
-            profile = await ProfileTable.objects().where(ProfileTable.registration == sk_id).first().run()
+            ProfileTable = SeekerPersonal if reg.capacity == 'personal' else SeekerInstitutional
+            profile = await ProfileTable.objects().where(
+                ProfileTable.registration == reg.id
+            ).first().run()
             if profile: name = profile.name
 
             detailed_seekers.append({
                 "name": name,
-                "phone": phone,
-                "capacity": cap,
-                "shift": shift
+                "phone": reg.account.phone if reg.account else "N/A",
+                "capacity": reg.capacity,
+                "shift": sp.work.job_type if sp.work else "not_specified"
             })
 
+        # --- 3. CONSTRUCT FINAL REPORT ---
         report.append({
             "service_name": s.name,
             "total_helpers": len(detailed_helpers),
@@ -144,7 +142,6 @@ async def get_service_deep_analytics():
         })
 
     return report
-
     
 async def admin_delete_user_permanently(account_id: str): # Reason removed from here
     # 1. Get the account

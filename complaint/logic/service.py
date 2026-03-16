@@ -50,6 +50,7 @@ async def get_proof_base64_from_path(relative_path: str):
             return f"data:{mime};base64,{encoded}"
     except: return None
 
+
 async def get_all_complaints():
     complaints = await Complaint.select(
         Complaint.all_columns(),
@@ -57,50 +58,62 @@ async def get_all_complaints():
     ).order_by(Complaint.created_at, ascending=False).run()
 
     for item in complaints:
-        # --- Existing Base64 and Reporter Name Logic ---
+        # --- Base64 Logic ---
         if item["proof_image"]:
             item["proof_image"] = await get_proof_base64_from_path(item["proof_image"])
         
-        user_name = "Unknown User"
-        registration_id = None 
-        reg = await Registration.objects().where(Registration.account == item["account_id"]).first().run()
-        if reg:
-            registration_id = str(reg.id) 
-            sp = await SeekerPersonal.objects().where(SeekerPersonal.registration == reg.id).first().run()
-            si = await SeekerInstitutional.objects().where(SeekerInstitutional.registration == reg.id).first().run()
-            hp = await HelperPersonal.objects().where(HelperPersonal.registration == reg.id).first().run()
-            hi = await HelperInstitutional.objects().where(HelperInstitutional.registration == reg.id).first().run()
-            profile = sp or si or hp or hi
-            if profile: user_name = getattr(profile, 'name', "Unknown User")
-        
-        item["user_name"] = user_name
-        item["registration_id"] = registration_id
+        # 1. IDENTIFY THE REPORTER (The person who clicked 'Submit')
+        reporter_name = "Unknown User"
+        reporter_reg = await Registration.objects().where(
+            Registration.account == item["account_id"]
+        ).first().run()
 
-        # --- NEW: Helper Details Lookup via Booking ID ---
+        if reporter_reg:
+            # Check all 4 tables for the reporter's name
+            sp = await SeekerPersonal.objects().where(SeekerPersonal.registration == reporter_reg.id).first().run()
+            si = await SeekerInstitutional.objects().where(SeekerInstitutional.registration == reporter_reg.id).first().run()
+            hp = await HelperPersonal.objects().where(HelperPersonal.registration == reporter_reg.id).first().run()
+            hi = await HelperInstitutional.objects().where(HelperInstitutional.registration == reporter_reg.id).first().run()
+            profile = sp or si or hp or hi
+            if profile: reporter_name = getattr(profile, 'name', "Unknown User")
+        
+        item["user_name"] = reporter_name # This is the "Customer Name" in your UI
+        item["registration_id"] = str(reporter_reg.id) if reporter_reg else None
+
+        # 2. IDENTIFY THE "OTHER PARTY" (The Accused)
         item["helper_id"] = None
         item["helper_name"] = "N/A"
         item["helper_phone"] = "N/A"
 
-        if item["booking_id"]:
-            # 1. Find the booking to get the helper's registration ID
-            booking = await ServiceBooking.objects().get(ServiceBooking.id == item["booking_id"]).run()
-            if booking and booking.helper:
-                helper_reg_id = booking.helper # This is the registration ID of the helper
-                item["helper_id"] = str(helper_reg_id)
+        if item["booking_id"] and reporter_reg:
+            booking = await ServiceBooking.objects().where(
+                ServiceBooking.id == item["booking_id"]
+            ).first().run()
 
-                # 2. Get Helper's phone from Account table via Registration
-                h_reg = await Registration.objects().get(Registration.id == helper_reg_id).run()
-                if h_reg:
-                    h_account = await Account.objects().get(Account.id == h_reg.account).run()
-                    item["helper_phone"] = h_account.phone if h_account else "N/A"
-
-                # 3. Get Helper's name (checking Personal and Institutional)
-                h_p = await HelperPersonal.objects().where(HelperPersonal.registration == helper_reg_id).first().run()
-                h_i = await HelperInstitutional.objects().where(HelperInstitutional.registration == helper_reg_id).first().run()
+            if booking:
+                # Determine who the complaint is AGAINST
+                # If reporter is the seeker, accused is the helper
+                # If reporter is the helper, accused is the seeker
+                is_reporter_seeker = (str(reporter_reg.id) == str(booking.seeker))
+                accused_reg_id = booking.helper if is_reporter_seeker else booking.seeker
                 
-                h_profile = h_p or h_i
-                if h_profile:
-                    item["helper_name"] = getattr(h_profile, 'name', "Unknown Helper")
+                item["helper_id"] = str(accused_reg_id)
+
+                # Fetch Accused Account/Phone
+                acc_reg = await Registration.objects().where(Registration.id == accused_reg_id).prefetch(Registration.account).first().run()
+                if acc_reg and acc_reg.account:
+                    item["helper_phone"] = acc_reg.account.phone
+
+                # Fetch Accused Name
+                # We check seeker tables if the helper complained, and vice-versa
+                a_sp = await SeekerPersonal.objects().where(SeekerPersonal.registration == accused_reg_id).first().run()
+                a_si = await SeekerInstitutional.objects().where(SeekerInstitutional.registration == accused_reg_id).first().run()
+                a_hp = await HelperPersonal.objects().where(HelperPersonal.registration == accused_reg_id).first().run()
+                a_hi = await HelperInstitutional.objects().where(HelperInstitutional.registration == accused_reg_id).first().run()
+                
+                accused_profile = a_sp or a_si or a_hp or a_hi
+                if accused_profile:
+                    item["helper_name"] = getattr(accused_profile, 'name', "Unknown")
 
     return complaints
 
@@ -155,3 +168,21 @@ async def get_user_complaint_history_logic(registration_id: str):
         item["user_name"] = user_name
 
     return complaints
+
+async def delete_resolved_complaint(complaint_id: str):
+    complaint = await Complaint.objects().where(
+        Complaint.id == complaint_id
+    ).first().run()
+
+    if not complaint:
+        return {"status": "error", "message": "Complaint not found in records."}
+
+    if complaint.status != "resolved":
+        return {
+            "status": "error", 
+            "message": f"Cannot delete. Complaint status is '{complaint.status}'. Only 'resolved' items can be removed."
+        }
+
+    await Complaint.delete().where(Complaint.id == complaint_id).run()
+    
+    return {"status": "success", "message": "Complaint has been permanently removed."}

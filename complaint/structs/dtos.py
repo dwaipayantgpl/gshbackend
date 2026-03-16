@@ -10,7 +10,7 @@ class ComplaintCreate(BaseModel):
 class ComplaintOut(BaseModel):
     id: UUID
     account_id: Optional[UUID]
-    registration_id: Optional[UUID]
+    registration_id: Optional[UUID] = None
     booking_id: Optional[UUID]
     category: str
     phone: Optional[str]      # Reporter's Phone
