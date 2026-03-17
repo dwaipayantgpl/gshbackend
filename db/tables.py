@@ -435,9 +435,12 @@ class ChatMessage(Table):
     booking = ForeignKey(references=ServiceBooking) 
     sender = ForeignKey(references=Registration)
     receiver = ForeignKey(references=Registration)
-    message = Text()
+    message = Text(nullable=True)
     created_at = Timestamptz(auto_now=True)
     is_read = Boolean(default=False)
+    file_url = Text(nullable=True)
+    file_name = Text(nullable=True)
+    file_type = Varchar(length=50, nullable=True)
 
 #-------------------  RATINGS ---------------------
 class Review(Table):
