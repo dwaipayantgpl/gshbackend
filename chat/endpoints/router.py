@@ -1,44 +1,68 @@
 from fastapi import APIRouter, Body, Depends
+from starlette import status
 
 from auth.logic.deps import get_current_registration
+from auth.logic.tokens import decode_access_token
 from chat.logic import service
 router = APIRouter()
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from chat.logic.chat_manager import manager
 from db.tables import ChatMessage, Registration
 
-@router.websocket("/stream/{booking_id}/{account_id}") # Note: URL now takes account_id
+@router.websocket("/stream/{booking_id}/{account_id}")
 async def websocket_endpoint(websocket: WebSocket, booking_id: str, account_id: str):
-    await websocket.accept()
+    # 1. ENFORCE AUTHORIZATION BEFORE ACCEPTING
+    auth_header = websocket.headers.get("authorization")
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        # Reject immediately if no token is present
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    token = auth_header.split(" ")[1]
     
     try:
-        # 1. NEW STEP: Look up the Registration linked to this Account
-        # We assume one Account has one Registration (or you pick the first one)
+        # 2. DECODE AND VERIFY
+        payload = decode_access_token(token)
+        token_sub = payload.get("sub") # This is usually the Account ID
+        
+        # 3. IDENTITY MATCH
+        # Ensure the person connecting IS who they say they are in the URL
+        if str(token_sub) != str(account_id):
+            print(f"SECURITY ALERT: Token ID {token_sub} does not match URL ID {account_id}")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+            
+    except Exception as e:
+        print(f"AUTH ERROR: {e}")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    # 4. IF AUTH PASSES, PROCEED
+    await websocket.accept() 
+    
+    try:
+        # Lookup Registration profile (Same as your current logic)
         user = await Registration.objects().where(
             Registration.account == account_id
         ).first().run()
         
         if not user:
-            print(f"DEBUG: No Registration found for Account ID: {account_id}")
-            await websocket.send_json({"error": "Registration profile not found for this account"})
-            await websocket.close(code=1008)
+            await websocket.send_json({"error": "Registration profile not found"})
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
-        # 2. Extract the TRUE Registration ID
         registration_id = str(user.id)
-        print(f"DEBUG: Account {account_id} is using Registration {registration_id}")
 
-        # 3. Permission Check using the Registration ID
+        # Permission Check (Scenario 1, 2, and 3 logic)
         try:
-            # We pass the registration_id here because bookings use Reg IDs
             await service.validate_chat_permission(booking_id, registration_id, user.role)
         except Exception as perm_err:
-            print(f"DEBUG: Permission Denied: {perm_err}")
             await websocket.send_json({"error": str(perm_err)})
-            await websocket.close(code=1008)
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
-        # 4. Join Manager
+        # Join Manager
         await manager.connect(websocket, booking_id)
         
         while True:
@@ -48,7 +72,7 @@ async def websocket_endpoint(websocket: WebSocket, booking_id: str, account_id: 
             if message_text:
                 new_msg = ChatMessage(
                     booking=booking_id,
-                    sender=registration_id, # Save using Reg ID
+                    sender=registration_id,
                     message=message_text
                 )
                 await new_msg.save()
@@ -64,7 +88,7 @@ async def websocket_endpoint(websocket: WebSocket, booking_id: str, account_id: 
     except Exception as e:
         print(f"DEBUG: Unexpected Server Error: {e}")
         if websocket.client_state.name != "DISCONNECTED":
-            await websocket.close(code=1011)
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
 
 
 @router.get("/chat/history/{booking_id}")

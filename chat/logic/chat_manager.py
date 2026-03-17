@@ -24,3 +24,4 @@ class ChatManager:
             for connection in self.active_connections[booking_id]:
                 await connection.send_json(message)
 
+manager = ChatManager()

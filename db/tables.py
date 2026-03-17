@@ -434,6 +434,7 @@ class ChatMessage(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
     booking = ForeignKey(references=ServiceBooking) 
     sender = ForeignKey(references=Registration)
+    receiver = ForeignKey(references=Registration)
     message = Text()
     created_at = Timestamptz(auto_now=True)
     is_read = Boolean(default=False)
