@@ -146,6 +146,7 @@ async def send_unified_message(
         "data": {
             "id": str(new_msg.id),
             "sender_id": str(sender.id),
+            "receiver_id": str(receiver_id),
             "message": new_msg.message,   # Fixed: uses the string from DB
             "file_url": new_msg.file_url, # Fixed: uses the path from DB
             "file_name": new_msg.file_name,
@@ -154,7 +155,16 @@ async def send_unified_message(
         }
     })
 
-    return {"status": "success", "id": str(new_msg.id)}
+    return {"status": "success", "message":{
+            "id": str(new_msg.id),
+            "sender_id": str(sender.id),
+            "receiver_id": str(receiver_id),
+            "message": new_msg.message,   # Fixed: uses the string from DB
+            "file_url": new_msg.file_url, # Fixed: uses the path from DB
+            "file_name": new_msg.file_name,
+            "file_type": new_msg.file_type,
+            "timestamp": datetime.now().isoformat()
+        }}
 
 @router.websocket("/stream/{booking_id}/{account_id}")
 async def websocket_endpoint(websocket: WebSocket, booking_id: str, account_id: str):
