@@ -217,3 +217,69 @@ async def get_chat_history(
         "booking_id": booking_id,
         "history": history
     }
+
+@router.patch("/messages/{message_id}")
+async def edit_chat_message(
+    message_id: str,
+    message: str = Body(..., embed=True),
+    current_user: Registration = Depends(get_current_registration)
+):
+    updated_message = await service.edit_chat_message_logic(
+        message_id=message_id,
+        user_id=str(current_user.id),
+        user_role=current_user.role,
+        new_message=message,
+    )
+
+    await manager.broadcast_to_booking(updated_message["booking_id"], {
+        "type": "message_edited",
+        "data": updated_message
+    })
+
+    return {
+        "status": "success",
+        "message": updated_message
+    }
+
+
+@router.delete("/messages/{message_id}")
+async def delete_chat_message(
+    message_id: str,
+    current_user: Registration = Depends(get_current_registration)
+):
+    # grab snapshot before delete so we still know which booking to broadcast to
+    existing_message = await ChatMessage.objects().where(
+        ChatMessage.id == message_id
+    ).first().run()
+
+    delete_result = await service.delete_chat_message_logic(
+        message_id=message_id,
+        user_id=str(current_user.id),
+        user_role=current_user.role,
+    )
+
+    if existing_message:
+        await manager.broadcast_to_booking(str(existing_message.booking), {
+            "type": "message_deleted",
+            "data": {
+                "id": message_id,
+                "booking_id": str(existing_message.booking)
+            }
+        })
+
+    return {
+        "status": "success",
+        **delete_result
+    }
+
+@router.get("/bookings")
+async def get_my_chat_booking_ids(
+    current_user: Registration = Depends(get_current_registration)
+):
+    chats = await service.get_user_chat_booking_ids_logic(str(current_user.id))
+
+    return {
+        "status": "success",
+        "user_id": str(current_user.id),
+        "chats": chats
+    }

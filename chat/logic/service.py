@@ -166,3 +166,109 @@ async def get_chat_history_logic(booking_id: str, user_id: str):
         }
         for m in messages
     ]
+
+async def edit_chat_message_logic(message_id: str, user_id: str, user_role: str, new_message: str):
+    message_obj = await ChatMessage.objects().get(ChatMessage.id == message_id).run()
+
+    if not message_obj:
+        raise HTTPException(status_code=404, detail="Message not found.")
+
+    # only the sender can edit
+    if str(message_obj.sender) != user_id:
+        raise HTTPException(status_code=403, detail="You can only edit your own message.")
+
+    # reuse existing booking-based permission logic
+    await validate_chat_permission(str(message_obj.booking), user_id, user_role)
+
+    cleaned_message = (new_message or "").strip()
+    if not cleaned_message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+
+    await ChatMessage.update(
+        {
+            ChatMessage.message: cleaned_message
+        }
+    ).where(
+        ChatMessage.id == message_id
+    ).run()
+
+    updated = await ChatMessage.objects().get(ChatMessage.id == message_id).run()
+
+    return {
+        "id": str(updated.id),
+        "booking_id": str(updated.booking),
+        "sender_id": str(updated.sender),
+        "receiver_id": str(updated.receiver),
+        "message": updated.message,
+        "file_url": updated.file_url,
+        "file_name": updated.file_name,
+        "file_type": updated.file_type,
+        "is_read": updated.is_read,
+        "timestamp": updated.created_at.isoformat()
+    }
+
+
+async def delete_chat_message_logic(message_id: str, user_id: str, user_role: str):
+    message_obj = await ChatMessage.objects().get(ChatMessage.id == message_id).run()
+
+    if not message_obj:
+        raise HTTPException(status_code=404, detail="Message not found.")
+
+    # only the sender can delete
+    if str(message_obj.sender) != user_id:
+        raise HTTPException(status_code=403, detail="You can only delete your own message.")
+
+    # reuse existing booking-based permission logic
+    await validate_chat_permission(str(message_obj.booking), user_id, user_role)
+
+    # optional: remove uploaded file from disk too
+    if message_obj.file_url:
+        filename = os.path.basename(message_obj.file_url)
+        full_path = os.path.join(UPLOAD_DIR, filename)
+        if os.path.exists(full_path):
+            try:
+                os.remove(full_path)
+            except Exception:
+                pass
+
+    await ChatMessage.delete().where(
+        ChatMessage.id == message_id
+    ).run()
+
+    return {
+        "success": True,
+        "message": "Chat message deleted successfully."
+    }
+
+async def get_user_chat_booking_ids_logic(user_id: str):
+    messages = await ChatMessage.objects().where(
+        (ChatMessage.sender == user_id) |
+        (ChatMessage.receiver == user_id)
+    ).order_by(
+        ChatMessage.created_at,
+        ascending=False
+    ).run()
+
+    seen = set()
+    chats = []
+
+    for msg in messages:
+        booking_id = str(msg.booking)
+
+        if booking_id in seen:
+            continue
+
+        seen.add(booking_id)
+
+        other_party_registration_id = (
+            str(msg.receiver)
+            if str(msg.sender) == str(user_id)
+            else str(msg.sender)
+        )
+
+        chats.append({
+            "booking_id": booking_id,
+            "other_party_registration_id": other_party_registration_id
+        })
+
+    return chats
