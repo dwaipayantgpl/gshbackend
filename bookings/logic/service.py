@@ -292,6 +292,7 @@ async def get_helper_bookings_logic(helper_id: str):
         ServiceBooking.all_columns(),
         ServiceBooking.service.name.as_alias("service_name"),
         ServiceBooking.seeker.id.as_alias("seeker_reg_id"),
+        ServiceBooking.seeker.account.id.as_alias("seeker_account_id"),
         ServiceBooking.seeker.account.phone.as_alias("seeker_phone")
     ).where(
         ServiceBooking.helper == helper_id
