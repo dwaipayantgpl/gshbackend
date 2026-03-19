@@ -2,7 +2,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from piccolo.engine import engine_finder
+from pathlib import Path
 
 from notifications.logic.socket import socket_app
 from auth.endpoints.router import router as auth_router
@@ -17,10 +19,11 @@ from bookings.endpoints.router import router as bookings_router
 from notifications.endpoints.router import router as notifications_router
 from ratings.endpoints.router import router as ratings_router
 from faq.endpoints.router import router as faq_router
-app = FastAPI()
 from dotenv import load_dotenv
 
 load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -46,6 +49,7 @@ app.add_middleware(
     allow_headers=["*"],          # allow all headers
 )
 app.mount("/ws", socket_app)
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(profiles_router, prefix="/profiles", tags=["profiles"])
 app.include_router(helper_router, prefix="/helper", tags=["helper"])
