@@ -659,7 +659,7 @@ async def get_specific_helper_full_details(target_id: str, current_reg: Registra
     main_pref = h_prefs[0]
     services = [{"id": str(p.service.id), "name": p.service.name} for p in h_prefs]
     
-    base64_pic=await get_profile_base64_logic(current_reg.id)
+    base64_pic=await get_profile_base64_logic(helper_id)
     # 5. CONSTRUCT FULL RESPONSE
     return {
         "status": "success",

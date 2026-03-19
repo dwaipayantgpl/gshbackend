@@ -225,7 +225,7 @@ async def get_matches_for_seeker_logic(user_id: str):
                 HelperPersonal.registration == h.registration.id
             ).first().run()
             
-            pic_base64 = await get_profile_base64_logic(user_id)
+            pic_base64 = await get_profile_base64_logic(h.registration.id)
             grouped_results[h_reg_id] = {
                 "match_details": {
                     "score": f"{round(match_pct)}%",
