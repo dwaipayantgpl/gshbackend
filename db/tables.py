@@ -1,10 +1,9 @@
 # db/tables.py
 import uuid
-import datetime 
 import decimal
 from piccolo.table import Table
 import piccolo.columns.choices as choices_module
-
+from datetime import datetime
 from piccolo.columns import (
     JSONB,
     UUID,
@@ -70,6 +69,10 @@ COMPLAINT_STATUS_CHOICES = [
     Choice("blocked", "blocked"), # Good to track if the issue led to a block
 ]
 
+ISONLINE_STATUS_CHOICES=[
+    Choice("online","online"),
+    Choice("offline","offline")
+]
 # ---------- Core identity ----------
 
 class Account(Table):
@@ -81,7 +84,7 @@ class Account(Table):
     password_hash = Varchar(length=255)
     created_at = Timestamptz()
     is_active = Boolean(default=True)
-
+    #is_user_online=Varchar(length=16,choices=ISONLINE_STATUS_CHOICES,default="offline")
 
 class Registration(Table):
     """
@@ -471,3 +474,12 @@ class Complaint(Table):
     proof_image = Text(null=True)
     status = Varchar(length=20, choices=COMPLAINT_STATUS_CHOICES, default="pending")
     created_at = Timestamptz(auto_now=True)
+
+#---------------  Login History -----------------
+class LoginHistory(Table):
+    id = UUID(primary_key=True, default=uuid.uuid4)
+    account = ForeignKey(references=Account)
+    registration = ForeignKey(references=Registration)
+    login_at = Timestamptz(default=datetime.now)
+    ip_address = Varchar(length=45, null=True)
+    user_agent = Varchar(length=255, null=True)

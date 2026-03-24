@@ -1,69 +1,10 @@
-# from fastapi import HTTPException
-# from db.tables import ChatMessage, ServiceBooking
-
-# async def validate_chat_permission(booking_id: str, sender_id: str, sender_role: str):
-#     booking = await ServiceBooking.objects().get(ServiceBooking.id == booking_id).run()
-#     if not booking:
-#         raise HTTPException(status_code=404, detail="Booking not found.")
-
-#     if booking.status == 'cancelled':
-#         raise HTTPException(
-#             status_code=403, 
-#             detail="Booking is cancelled. Chat is disabled."
-#         )
-
-#     is_seeker = str(booking.seeker) == sender_id
-#     is_helper = str(booking.helper) == sender_id
-
-#     if not (is_seeker or is_helper):
-#         raise HTTPException(status_code=403, detail="Unauthorized.")
-
-#     if sender_role == 'helper':
-#         if booking.status == 'accepted':
-#             return True
-
-#         if booking.status == 'pending':
-#             first_seeker_msg = await ChatMessage.objects().where(
-#                 (ChatMessage.booking == booking_id) & 
-#                 (ChatMessage.sender == booking.seeker)
-#             ).first().run()
-
-#             if not first_seeker_msg:
-#                 raise HTTPException(
-#                     status_code=403, 
-#                     detail="Helper cannot send the first message for a pending request."
-#                 )
-
-#     return True
-
-
-# async def get_chat_history_logic(booking_id: str, user_id: str, limit: int = 50):
-#     # Ensure user belongs to the chat
-#     booking = await ServiceBooking.objects().get(
-#         (ServiceBooking.id == booking_id) & 
-#         ((ServiceBooking.seeker == user_id) | (ServiceBooking.helper == user_id))
-#     ).run()
-
-#     if not booking:
-#         from fastapi import HTTPException
-#         raise HTTPException(status_code=403, detail="Unauthorized")
-
-#     messages = await ChatMessage.objects().where(
-#         ChatMessage.booking == booking_id
-#     ).order_by(
-#         ChatMessage.created_at, ascending=False # Piccolo syntax
-#     ).limit(limit).run()
-
-#     # Return in chronological order for UI
-#     return messages[::-1]
-
 
 import os
 import shutil
 import uuid
 
 from fastapi import HTTPException, UploadFile
-from db.tables import ChatMessage, ServiceBooking
+from db.tables import ChatMessage, Registration, ServiceBooking
 from datetime import datetime
 
 
@@ -240,6 +181,8 @@ async def delete_chat_message_logic(message_id: str, user_id: str, user_role: st
         "message": "Chat message deleted successfully."
     }
 
+
+
 async def get_user_chat_booking_ids_logic(user_id: str):
     messages = await ChatMessage.objects().where(
         (ChatMessage.sender == user_id) |
@@ -250,25 +193,52 @@ async def get_user_chat_booking_ids_logic(user_id: str):
     ).run()
 
     seen = set()
-    chats = []
+    temp_chats = []
+    other_party_ids = set()
 
     for msg in messages:
         booking_id = str(msg.booking)
-
         if booking_id in seen:
             continue
+        
+        # Determine the other party's ID
+        sender_id = str(msg.sender) if msg.sender else None
+        receiver_id = str(msg.receiver) if msg.receiver else None
 
-        seen.add(booking_id)
-
-        other_party_registration_id = (
-            str(msg.receiver)
-            if str(msg.sender) == str(user_id)
-            else str(msg.sender)
+        other_party_reg_id = (
+            receiver_id if sender_id == user_id else sender_id
         )
+        
+        # CRITICAL FIX: Only add to the list if it's not None and not the string "None"
+        if other_party_reg_id and other_party_reg_id != "None":
+            seen.add(booking_id)
+            temp_chats.append({
+                "booking_id": booking_id,
+                "other_party_registration_id": other_party_reg_id
+            })
+            other_party_ids.add(other_party_reg_id)
 
-        chats.append({
-            "booking_id": booking_id,
-            "other_party_registration_id": other_party_registration_id
+    # If no valid chats were found, return empty list early
+    if not other_party_ids:
+        return []
+
+    # Bulk fetch using the corrected .is_in() method
+    profiles = await Registration.select(
+        Registration.id,
+        Registration.account 
+    ).where(
+        Registration.id.is_in(list(other_party_ids))
+    ).run()
+
+    profile_map = {str(p['id']): str(p['account']) for p in profiles}
+
+    final_chats = []
+    for chat in temp_chats:
+        reg_id = chat["other_party_registration_id"]
+        final_chats.append({
+            "booking_id": chat["booking_id"],
+            "other_party_registration_id": reg_id,
+            "other_party_account_id": profile_map.get(reg_id)
         })
 
-    return chats
+    return final_chats

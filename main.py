@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from piccolo.engine import engine_finder
 from pathlib import Path
 
-from notifications.logic.socket import socket_app
+#from notifications.logic.socket import socket_app
 from auth.endpoints.router import router as auth_router
 from profiles.endpoints.router import router as profiles_router
 from helper.endpoints.router import router as helper_router
@@ -48,7 +48,8 @@ app.add_middleware(
     allow_methods=["*"],          # allow all HTTP methods
     allow_headers=["*"],          # allow all headers
 )
-app.mount("/ws", socket_app)
+#app.mount("/ws", socket_app)
+#app.mount("/", socket_app)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(profiles_router, prefix="/profiles", tags=["profiles"])

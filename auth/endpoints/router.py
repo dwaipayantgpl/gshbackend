@@ -1,11 +1,15 @@
 # app/auth/endpoints/router.py
-from fastapi import APIRouter, status, Depends
+from datetime import timedelta
+import datetime
+
+from fastapi import APIRouter, HTTPException, status, Depends
 from auth.logic import auth_service
 from auth.structs.dtos import ChangePasswordIn, ForgotPasswordIn, SignUpIn, SignInIn, SignInOut, SignUpOut
-from auth.logic.auth_service import signup, signin
+from auth.logic.auth_service import get_inactive_users_report, signup, signin
 from auth.structs.dtos import MeOut
 from auth.logic.deps import get_current_account_id
 from auth.logic.auth_service import get_me
+from db.tables import Account, Registration
 router = APIRouter()
 
 @router.post(
@@ -77,3 +81,38 @@ async def change_password(
 @router.post("/forgot-password", summary="Reset password using only phone (No OTP)")
 async def forgot_password(payload: ForgotPasswordIn):
     return await auth_service.reset_password(payload)
+
+
+@router.get("/reports/inactive-users")
+async def inactive_users_api(months: int = 3):
+    """
+    Get full details of users who haven't logged in for a long time.
+    """
+    try:
+        data = await get_inactive_users_report(months)
+        
+        # Format the response for the frontend table
+        return {
+            "status": "success",
+            "count": len(data),
+            "threshold_months": months,
+            "data": data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
+    
+
+# auth/endpoints/admin_router.py
+
+@router.get("/user-activity/{registration_id}")
+async def get_specific_user_activity(registration_id: str):
+    """
+    Checks if a specific user's last login was within the last 3 months.
+    """
+    try:
+        result = await auth_service.check_user_activity_status(registration_id)
+        return result
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")

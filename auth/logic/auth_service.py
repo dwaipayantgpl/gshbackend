@@ -1,8 +1,11 @@
+from datetime import datetime, timedelta
+
+from fastapi import Request
 from fastapi import HTTPException, status
 from asyncpg.exceptions import UniqueViolationError
 
 from auth.structs.dtos import ChangePasswordIn, ForgotPasswordIn
-from db.tables import Account, BlacklistedUser, Registration
+from db.tables import Account, BlacklistedUser, LoginHistory, Registration
 from auth.logic.passwords import hash_password, verify_password
 from auth.logic.tokens import create_access_token
 
@@ -54,7 +57,14 @@ async def signin(*, phone: str, password: str) -> dict:
     if not account or not verify_password(password, account.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     reg = await Registration.objects().where(Registration.account == account.id).first()
-
+    
+    if reg:
+        await LoginHistory.insert(
+            LoginHistory(
+                account=account.id,
+                registration=reg.id,
+            )
+        ).run()
     user_type = None
     if reg:
         if reg.role in ("seeker", "helper"):
@@ -65,6 +75,7 @@ async def signin(*, phone: str, password: str) -> dict:
             user_type = "admin"
 
     token = create_access_token(sub=str(account.id))
+
     return {
         "access_token": token,
         "type": user_type,
@@ -124,3 +135,52 @@ async def reset_password(payload: ForgotPasswordIn):
     await account.save()
     
     return {"message": f"Password for {payload.phone} has been reset successfully"}
+
+
+async def get_inactive_users_report(months: int = 3):
+    cutoff_date = datetime.now() - timedelta(days=months * 30)
+    report = await Registration.select(
+        #Registration.full_name, 
+        Registration.role,
+        Account.phone
+    ).join(
+        Account, Account.id == Registration.account
+    ).where(
+        (Account.last_login < cutoff_date) | (Account.last_login == None)
+    ).run()
+
+    return report
+
+async def check_user_activity_status(registration_id: str):
+    # 1. Calculate the 3-month cutoff
+    three_months_ago = datetime.now() - timedelta(days=90)
+
+    # 2. Get User Details + Account info in one Join
+    user_data = await Registration.select(
+        Registration.full_name,
+        Registration.role,
+        Account.phone,
+        Account.last_login
+    ).join(
+        Account, Account.id == Registration.account
+    ).where(
+        Registration.id == registration_id
+    ).first().run()
+
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 3. Check if last_login is within the last 3 months
+    last_login = user_data['last_login']
+    
+    is_active_recently = False
+    if last_login:
+        # If last_login is newer (greater) than 3 months ago
+        is_active_recently = last_login > three_months_ago
+
+    return {
+        "user_details": user_data,
+        "is_active_in_last_3_months": is_active_recently,
+        "last_login_date": last_login,
+        "cutoff_date_used": three_months_ago
+    }
