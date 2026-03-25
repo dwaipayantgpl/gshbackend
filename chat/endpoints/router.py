@@ -7,10 +7,11 @@ from starlette import status
 from auth.logic.deps import get_current_registration
 from auth.logic.tokens import decode_access_token
 from chat.logic import service
+from notifications.logic.service import NotificationService
 router = APIRouter()
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from chat.logic.chat_manager import PresenceManager, manager
-from db.tables import ChatMessage, Registration, ServiceBooking
+from db.tables import ChatMessage, HelperInstitutional, HelperPersonal, Registration, SeekerInstitutional, SeekerPersonal, ServiceBooking
 
 
 
@@ -60,19 +61,58 @@ async def send_unified_message(
         }
     })
 
+    
+    
     try:
-        from notifications.logic.service import NotificationService
-        # CHANGE THIS LINE BELOW:
-        await NotificationService.trigger(  # Removed "_notification"
-            user_id=str(receiver_id),
-            title="New Message",
-            content=f"{new_msg.message}",
-            booking_id=booking_id
+        target_id = str(receiver_id).lower() 
+        sender_display_name = "User"
+
+    # 1. Determine which profile table to check based on role and capacity
+        role = sender.role  # from Registration table
+        capacity = sender.capacity # from Registration table
+
+        profile = None
+        if role == "seeker":
+         if capacity == "personal":
+            profile = await SeekerPersonal.objects().get(SeekerPersonal.registration == sender.id).run()
+         else:
+            profile = await SeekerInstitutional.objects().get(SeekerInstitutional.registration == sender.id).run()
+        elif role == "helper":
+         if capacity == "personal":
+            profile = await HelperPersonal.objects().get(HelperPersonal.registration == sender.id).run()
+        else:
+            profile = await HelperInstitutional.objects().get(HelperInstitutional.registration == sender.id).run()
+
+        if profile and hasattr(profile, 'name') and profile.name:
+         sender_display_name = profile.name
+
+    # 3. Trigger the notification
+        await NotificationService.trigger(
+        user_id=target_id,
+        title=f"New Message from {sender_display_name}",
+        content=f"{new_msg.message}",
+        category="chat",
+        booking_id=str(booking_id),
+        extra_metadata={
+            "sender_id": str(sender.id),
+            "sender_name": sender_display_name,
+            "chat_id": str(new_msg.id),
+            "booking_id": str(booking_id)
+        }
         )
+        print(f"✅ Sent notification to {target_id} as '{sender_display_name}'")
+
     except Exception as e:
-        print(f"Notification Error: {e}")
-    
-    
+        print(f"❌ Notification name resolution failed: {e}")
+    # Fallback if query fails
+        await NotificationService.trigger(
+        user_id=str(receiver_id).lower(),
+        title="New Message",
+        content=f"{new_msg.message}",
+        category="chat",
+        booking_id=str(booking_id),
+        extra_metadata={"sender_name": "User"}
+    )
     return {"status": "success", "message":{
             "id": str(new_msg.id),
             "sender_id": str(sender.id),

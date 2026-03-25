@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status # Fixed imports
 from auth.logic.deps import get_current_account_id, get_current_registration, require_admin
 from db.tables import Registration, Service # Use consistent path
+from notifications.logic.service import NotificationService
 from services.logic import service_logic
 from services.structs.dtos import AdminDashboardOut, DateRangeIn, ServiceCreateIn, ServiceOut, ServiceUpdateIn
 
@@ -26,6 +27,18 @@ async def create_service(
     # Logic simplified: Use the table imported at the top
     service = Service(**payload.model_dump())
     await service.save()
+
+    try:
+        await NotificationService.broadcast_new_service(
+            service_name=service.name,
+            description=service.description or "",
+            service_id=str(service.id) # Crucial: Pass the ID as a string
+        )
+        print(f"✅ Global broadcast sent for {service.name}")
+    except Exception as e:
+        # Log error but don't fail the HTTP response
+        print(f"❌ Broadcast Error: {e}")
+        
     return service
 
 @router.patch("/patch/{service_id}", response_model=ServiceOut)

@@ -1,4 +1,5 @@
 # db/tables.py
+import enum
 import uuid
 import decimal
 from piccolo.table import Table
@@ -72,6 +73,15 @@ COMPLAINT_STATUS_CHOICES = [
 ISONLINE_STATUS_CHOICES=[
     Choice("online","online"),
     Choice("offline","offline")
+]
+
+NOTIFICATION_CATEGORY_CHOICES = [
+    Choice("chat", "chat"),
+    Choice("booking_request", "booking_request"),
+    Choice("booking_accepted", "booking_accepted"),
+    Choice("booking_rejected", "booking_rejected"),
+    Choice("rating_reminder", "rating_reminder"),
+    Choice("admin_broadcast", "admin_broadcast")
 ]
 # ---------- Core identity ----------
 
@@ -422,12 +432,20 @@ class ServiceBooking(Table):
     status = Varchar(length=20, default="pending")
     created_at = Timestamptz(auto_now=True)
 
-
 class Notifiactions(Table): 
     id = UUID(primary_key=True, default=uuid.uuid4)
     recipient = ForeignKey(references=Registration)
+    
+    # --- ADDED CATEGORY WITH CHOICES ---
+    category = Varchar(
+        length=50, 
+        choices=NOTIFICATION_CATEGORY_CHOICES, 
+        default="booking_request"
+    )
+
     title = Varchar(length=1000)
     content = Text()
+    metadata = JSONB(null=True)
     booking_id = UUID(null=True)
     is_read = Boolean(default=False)
     created_at = Timestamptz(auto_now=True)

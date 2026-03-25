@@ -37,6 +37,21 @@ async def create_service_booking_logic(seeker_id: str, data: dict):
     ).first().run()
     
     service_info = await Service.objects().get(Service.id == data['service_id'])
+    
+    seeker_profile = await Registration.objects().get(Registration.id == seeker_id).run()
+    seeker_name = seeker_profile.account if seeker_profile else "A Seeker"
+
+    try:
+        target_helper_id = data.get('helper_id') or data.get('helper')
+        
+        await NotificationService.trigger(
+            user_id=str(target_helper_id),
+            title="New Booking Request",
+            content=f"You have a booking new request from {data['customer_name']}.",
+            booking_id=str(booking.id)
+        )
+    except Exception as e:
+        print(f"Notification Error: {e}")
 
     # 3. Return the Step 9 Summary
     return {
@@ -258,8 +273,70 @@ async def update_booking_status(booking_id: str, new_status: str, current_reg: R
     # ----------------------------------
 
     booking_obj.status = new_status
-    await booking_obj.save()
+    await booking_obj.save().run() # Added .run() for safety
     
+    # 1. Fetch Helper's Name
+    helper_profile = await HelperPersonal.objects().where(
+        HelperPersonal.registration == current_reg.id
+    ).first().run()
+    display_name = helper_profile.name if (helper_profile and helper_profile.name) else (current_reg.account or "A Helper")
+    
+    # 2. Fetch Seeker's Name (REQUIRED for the Helper's notification)
+    seeker_reg = await Registration.objects().get(Registration.id == booking_obj.seeker).run()
+    seeker_name = seeker_reg.account if seeker_reg else "The Seeker"
+
+    action = "accepted" if new_status == "accepted" else "rejected"
+
+    # --- MAIN STATUS NOTIFICATION ---
+    try:
+        target_id = str(booking_obj.seeker.id if hasattr(booking_obj.seeker, 'id') else booking_obj.seeker)
+        from notifications.logic.service import NotificationService
+        
+        await NotificationService.trigger(
+            user_id=target_id,
+            title=f"Booking {action.capitalize()}",
+            content=f"{display_name} has {action} your booking request.",
+            booking_id=str(booking_id)
+        )
+        print(f"✅ Success: Notification triggered for {target_id} with name {display_name}")
+    except Exception as e:
+        print(f"❌ Notification Error: {e}")
+
+    # --- RATING NOTIFICATIONS (ONLY IF ACCEPTED) ---
+    if new_status == 'accepted':
+        try:
+            # 1. FIX THE SEEKER ID
+            # Use .id to get the UUID, then str() to make it a string
+            clean_seeker_id = str(booking_obj.seeker.id if hasattr(booking_obj.seeker, 'id') else booking_obj.seeker)
+            
+            # 2. FIX THE HELPER ID 
+            # current_reg is the helper; use its ID directly
+            clean_helper_id = str(current_reg.id)
+
+            # --- TO SEEKER ---
+            await NotificationService.trigger(
+                user_id=clean_seeker_id, # FIXED
+                title="Rate your Helper! ⭐",
+                content=f"Once the work is done, don't forget to rate {display_name}!",
+                booking_id=str(booking_id)
+            )
+
+            seeker_reg = await Registration.objects().get(Registration.id == booking_obj.seeker).run()
+
+# 2. Get the clean Name (if 'account' is an ID, you might need a different field like 'full_name')
+            seeker_display_name = seeker_reg.account if seeker_reg else "the Seeker"
+            # --- TO HELPER ---
+            await NotificationService.trigger(
+                user_id=clean_helper_id, # FIXED
+                title="Rate the Seeker! ⭐",
+                content=f"Once you finish the job, please rate your experience with {seeker_display_name}.",
+                booking_id=str(booking_id)
+            )
+            
+            print(f"✅ Rating reminders sent to {display_name} and {seeker_name}")
+        except Exception as e:
+            print(f"❌ Rating Notification Error: {e}")
+
     return {
         "status": "success", 
         "message": f"You have {new_status} the booking.",
