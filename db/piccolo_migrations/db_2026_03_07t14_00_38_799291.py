@@ -1,17 +1,19 @@
 from piccolo.apps.migrations.auto.migration_manager import MigrationManager
-from piccolo.columns.base import OnDelete
-from piccolo.columns.base import OnUpdate
-from piccolo.columns.column_types import Boolean
-from piccolo.columns.column_types import ForeignKey
-from piccolo.columns.column_types import Text
-from piccolo.columns.column_types import Timestamptz
-from piccolo.columns.column_types import UUID
-from piccolo.columns.column_types import Varchar
+from piccolo.columns.base import OnDelete, OnUpdate
+from piccolo.columns.choices import Choice
+from piccolo.columns.column_types import (
+    UUID,
+    Boolean,
+    ForeignKey,
+    Text,
+    Timestamptz,
+    Varchar,
+)
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
 from piccolo.columns.defaults.uuid import UUID4
 from piccolo.columns.indexes import IndexMethod
 from piccolo.table import Table
-from piccolo.columns.choices import Choice
+
 
 class Registration(Table, tablename="registration", schema=None):
     id = UUID(
@@ -47,9 +49,7 @@ DESCRIPTION = ""
 
 
 async def forwards():
-    manager = MigrationManager(
-        migration_id=ID, app_name="db", description=DESCRIPTION
-    )
+    manager = MigrationManager(migration_id=ID, app_name="db", description=DESCRIPTION)
 
     manager.add_table(
         class_name="Notifiactions",

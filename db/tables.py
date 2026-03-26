@@ -1,37 +1,38 @@
 # db/tables.py
-import enum
-import uuid
 import decimal
-from piccolo.table import Table
-import piccolo.columns.choices as choices_module
+import uuid
 from datetime import datetime
+
 from piccolo.columns import (
     JSONB,
     UUID,
-    Varchar,
     Boolean,
-    Timestamptz,
+    Date,
     ForeignKey,
     Integer,
     Numeric,
     Text,
     Timestamp,
-    Date
+    Timestamptz,
+    Varchar,
 )
+
 # This is the correct way to import Choice
 from piccolo.columns.choices import Choice
+from piccolo.table import Table
+
 # ---------- Choice sets (enums) ----------
 
 ROLE_CHOICES = [
     Choice("seeker", "seeker"),
     Choice("helper", "helper"),
     Choice("both", "both"),
-    Choice("admin", "admin")
+    Choice("admin", "admin"),
 ]
 
 CAPACITY_CHOICES = [
     Choice("personal", "personal"),
-    Choice("institutional", "institutional")
+    Choice("institutional", "institutional"),
 ]
 
 JOB_TYPE_CHOICES = [
@@ -67,13 +68,10 @@ COMPLAINT_STATUS_CHOICES = [
     Choice("pending", "pending"),
     Choice("in_progress", "in_progress"),
     Choice("resolved", "resolved"),
-    Choice("blocked", "blocked"), # Good to track if the issue led to a block
+    Choice("blocked", "blocked"),  # Good to track if the issue led to a block
 ]
 
-ISONLINE_STATUS_CHOICES=[
-    Choice("online","online"),
-    Choice("offline","offline")
-]
+ISONLINE_STATUS_CHOICES = [Choice("online", "online"), Choice("offline", "offline")]
 
 NOTIFICATION_CATEGORY_CHOICES = [
     Choice("chat", "chat"),
@@ -81,27 +79,31 @@ NOTIFICATION_CATEGORY_CHOICES = [
     Choice("booking_accepted", "booking_accepted"),
     Choice("booking_rejected", "booking_rejected"),
     Choice("rating_reminder", "rating_reminder"),
-    Choice("admin_broadcast", "admin_broadcast")
+    Choice("admin_broadcast", "admin_broadcast"),
 ]
 # ---------- Core identity ----------
+
 
 class Account(Table):
     """
     Login + credentials.
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
     phone = Varchar(length=20, unique=True)
     password_hash = Varchar(length=255)
     created_at = Timestamptz()
     is_active = Boolean(default=True)
-    #is_user_online=Varchar(length=16,choices=ISONLINE_STATUS_CHOICES,default="offline")
+    # is_user_online=Varchar(length=16,choices=ISONLINE_STATUS_CHOICES,default="offline")
+
 
 class Registration(Table):
     """
     Role + capacity (personal / institutional) for an account.
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
-    account = ForeignKey(references=Account, unique = True)
+    account = ForeignKey(references=Account, unique=True)
     role = Varchar(length=16, choices=ROLE_CHOICES)
     capacity = Varchar(length=16, choices=CAPACITY_CHOICES)
     created_at = Timestamptz()
@@ -110,11 +112,13 @@ class Registration(Table):
 
 # ---------- Seeker details ----------
 
+
 class SeekerPersonal(Table):
     """
     Personal seeker profile.
     One-to-one with a personal Registration.
     """
+
     registration = ForeignKey(references=Registration, unique=True)
     name = Varchar(length=100)
     city = Varchar(length=100)
@@ -127,6 +131,7 @@ class SeekerInstitutional(Table):
     """
     Institutional seeker profile.
     """
+
     registration = ForeignKey(references=Registration, unique=True)
     name = Varchar(length=200)
     city = Varchar(length=100)
@@ -139,10 +144,12 @@ class SeekerInstitutional(Table):
 
 # ---------- Helper details ----------
 
+
 class HelperPersonal(Table):
     """
     Personal helper profile.
     """
+
     registration = ForeignKey(references=Registration, unique=True)
     name = Varchar(length=100)
     age = Integer(null=True)
@@ -160,6 +167,7 @@ class HelperInstitutional(Table):
     """
     Institutional helper (e.g. agency, hospital, etc).
     """
+
     registration = ForeignKey(references=Registration, unique=True)
     name = Varchar(length=200)
     city = Varchar(length=100)
@@ -171,10 +179,12 @@ class HelperInstitutional(Table):
 
 # ---------- Services & skills ----------
 
+
 class Service(Table):
     """
     What a seeker asks for (electrician, driver, etc.).
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
     name = Varchar(length=100)
     description = Text(null=True)
@@ -184,6 +194,7 @@ class Skill(Table):
     """
     More granular ability (AC repair, ICU nursing, etc.).
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
     name = Varchar(length=100)
     description = Text(null=True)
@@ -193,6 +204,7 @@ class HelperService(Table):
     """
     Many-to-many: which services a helper can provide.
     """
+
     helper = ForeignKey(references=Registration)  # helper registration
     service = ForeignKey(references=Service)
 
@@ -204,6 +216,7 @@ class HelperSkill(Table):
     """
     Many-to-many: which skills a helper has.
     """
+
     helper = ForeignKey(references=Registration)
     skill = ForeignKey(references=Skill)
 
@@ -216,6 +229,7 @@ class HelperPreferredService(Table):
     """
     Many-to-many: preferred services (subset of HelperService).
     """
+
     registration = ForeignKey(references=Registration)
     service = ForeignKey(references=Service)
 
@@ -227,6 +241,7 @@ class HelperExperience(Table):
     """
     Experience items, both personal and institutional (distinguished by Registration.capacity).
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
     registration = ForeignKey(references=Registration)
     year_from = Integer(null=True)
@@ -239,10 +254,12 @@ class HelperExperience(Table):
 
 # ---------- Jobs ----------
 
+
 class JobRequest(Table):
     """
     What you called Jobrequirements.
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
     seeker = ForeignKey(references=Registration)
     headline = Varchar(length=200)
@@ -260,6 +277,7 @@ class JobRequestService(Table):
     """
     Many-to-many: services needed for a job request.
     """
+
     job_request = ForeignKey(references=JobRequest)
     service = ForeignKey(references=Service)
 
@@ -271,10 +289,13 @@ class JobApplication(Table):
     """
     What you called applications.
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
     job_request = ForeignKey(references=JobRequest)
     helper = ForeignKey(references=Registration)
-    status = Varchar(length=20, choices=JOB_APPLICATION_STATUS_CHOICES, default="pending")
+    status = Varchar(
+        length=20, choices=JOB_APPLICATION_STATUS_CHOICES, default="pending"
+    )
     created_at = Timestamptz()
 
 
@@ -282,6 +303,7 @@ class Job(Table):
     """
     Confirmed engagement between seeker and helper for a JobRequest.
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
     job_request = ForeignKey(references=JobRequest)
     helper = ForeignKey(references=Registration)
@@ -293,10 +315,12 @@ class Job(Table):
 
 # ---------- Ratings ----------
 
+
 class Rating(Table):
     """
     One rating from one user to another, usually tied to a Job.
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
     job = ForeignKey(references=Job)
     rater = ForeignKey(references=Registration)
@@ -307,6 +331,7 @@ class Rating(Table):
 
 
 # ---------- Messaging ----------
+
 
 class Message(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
@@ -325,14 +350,13 @@ class MessageAttachment(Table):
 # block list user
 class BlacklistedUser(Table):
     phone = Varchar(length=20, unique=True)
-    #reason = Text()
+    # reason = Text()
     banned_at = Timestamptz()
 
+
 class BlockedUser(Table):
-    account = ForeignKey(references=Account, unique=True) 
+    account = ForeignKey(references=Account, unique=True)
     blocked_at = Timestamptz(auto_now=True)
-
-
 
 
 # ---------- seeker Helper preferences ----------
@@ -340,28 +364,32 @@ class PreferenceLocation(Table):
     city = Varchar(length=100, index=True)
     area = Varchar(length=100, index=True)
 
+
 class PreferenceWork(Table):
-    job_type = Varchar(length=50) 
+    job_type = Varchar(length=50)
     work_mode = Varchar(length=50)
     working_days = Integer(default=6)
     weekly_off = Varchar(length=20)
     accommodation = Boolean(default=False)
 
+
 class PreferenceRequirements(Table):
-    min_salary = Integer(null=True,default=15000) 
-    max_salary = Integer(null=True,default=20000)
+    min_salary = Integer(null=True, default=15000)
+    max_salary = Integer(null=True, default=20000)
     gender = Varchar(length=20, default="any")
     min_age = Integer(null=True)
     max_age = Integer(null=True)
     experience = Varchar(length=50, default="0")
 
+
 class HelperDetails(Table):
-    skills = Varchar(length=500, null=True) 
+    skills = Varchar(length=500, null=True)
+
 
 class SeekerPreferenceNew(Table):
     registration = ForeignKey(references=Registration)
     service = ForeignKey(references=Service)
-    
+
     # Use null=True here so the migration doesn't complain about old data
     location = ForeignKey(references=PreferenceLocation, null=True)
     work = ForeignKey(references=PreferenceWork, null=True)
@@ -372,35 +400,42 @@ class SeekerPreferenceNew(Table):
         unique_together = (("registration", "service"),)
 
 
-
 SeekerPreference = SeekerPreferenceNew
 
-#--------------------- Helper preference--------------
+
+# --------------------- Helper preference--------------
 class HelperSpecialPreferences(Table):
-    skills = Varchar(length=500, null=True) 
-    special_preferences = Varchar(length=1000, null=True) 
+    skills = Varchar(length=500, null=True)
+    special_preferences = Varchar(length=1000, null=True)
+
 
 class HelperPreference(Table):
     registration = ForeignKey(references=Registration)
-    service = ForeignKey(references=Service) 
-    location = ForeignKey(references=PreferenceLocation, null=True) 
-    work = ForeignKey(references=PreferenceWork, null=True) 
-    requirements = ForeignKey(references=PreferenceRequirements, null=True) 
-    helperpreference_details = ForeignKey(references=HelperSpecialPreferences, null=True) 
+    service = ForeignKey(references=Service)
+    location = ForeignKey(references=PreferenceLocation, null=True)
+    work = ForeignKey(references=PreferenceWork, null=True)
+    requirements = ForeignKey(references=PreferenceRequirements, null=True)
+    helperpreference_details = ForeignKey(
+        references=HelperSpecialPreferences, null=True
+    )
+
     class Meta:
         unique_together = (("registration", "service"),)
 
-#-------------------------add profile picture ---------------------
+
+# -------------------------add profile picture ---------------------
 class ProfilePicture(Table):
     account = ForeignKey(references=Account, unique=True)
     file_path = Varchar(length=500)
     updated_at = Timestamp(auto_now=True)
 
-#-----------------  helper or seeker book ---------------------
+
+# -----------------  helper or seeker book ---------------------
 class ServiceBooking(Table):
     """
     Comprehensive table for the 9-step booking flow.
     """
+
     id = UUID(primary_key=True, default=uuid.uuid4)
     seeker = ForeignKey(references=Registration)
     customer_name = Varchar(length=100)
@@ -411,36 +446,32 @@ class ServiceBooking(Table):
     area = Varchar(length=100)
     pin_code = Varchar(length=10)
     service = ForeignKey(references=Service)
-    helper = ForeignKey(references=Registration) 
+    helper = ForeignKey(references=Registration)
 
     booking_date = Date()
-    time_slot = Varchar(length=20) # Morning, Afternoon, Evening
+    time_slot = Varchar(length=20)  # Morning, Afternoon, Evening
 
     work_details = JSONB()
 
-    duration = Varchar(length=50,null=True) # e.g., "4 Hours", "Full Day", "Monthly"
+    duration = Varchar(length=50, null=True)  # e.g., "4 Hours", "Full Day", "Monthly"
 
     preferences = JSONB(null=True)
 
-    payment_method = Varchar(length=30) # UPI, Cash, Card
+    payment_method = Varchar(length=30)  # UPI, Cash, Card
     total_price = Numeric(
-        precision=10, 
-        scale=2, 
-        default=decimal.Decimal("0.00"), 
-        null=True
+        precision=10, scale=2, default=decimal.Decimal("0.00"), null=True
     )
     status = Varchar(length=20, default="pending")
     created_at = Timestamptz(auto_now=True)
 
-class Notifiactions(Table): 
+
+class Notifiactions(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
     recipient = ForeignKey(references=Registration)
-    
+
     # --- ADDED CATEGORY WITH CHOICES ---
     category = Varchar(
-        length=50, 
-        choices=NOTIFICATION_CATEGORY_CHOICES, 
-        default="booking_request"
+        length=50, choices=NOTIFICATION_CATEGORY_CHOICES, default="booking_request"
     )
 
     title = Varchar(length=1000)
@@ -450,10 +481,11 @@ class Notifiactions(Table):
     is_read = Boolean(default=False)
     created_at = Timestamptz(auto_now=True)
 
+
 # ------------------- CHAT SYSTEM -----------
 class ChatMessage(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
-    booking = ForeignKey(references=ServiceBooking) 
+    booking = ForeignKey(references=ServiceBooking)
     sender = ForeignKey(references=Registration)
     receiver = ForeignKey(references=Registration)
     message = Text(nullable=True)
@@ -463,37 +495,40 @@ class ChatMessage(Table):
     file_name = Text(nullable=True)
     file_type = Varchar(length=50, nullable=True)
 
-#-------------------  RATINGS ---------------------
+
+# -------------------  RATINGS ---------------------
 class Review(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
     booking = ForeignKey(references=ServiceBooking)
     seeker = ForeignKey(references=Registration)
     helper = ForeignKey(references=Registration)
-    rating = Integer() 
+    rating = Integer()
     comment = Text(null=True)
     created_at = Timestamptz(auto_now=True)
+
 
 # ----------- FAQ ------------------
 class FAQ(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
     question = Text(required=True)
     answer = Text(required=True)
-    target_role = Varchar(length=20, default='both') 
+    target_role = Varchar(length=20, default="both")
     created_at = Timestamptz(auto_now=True)
-    
+
 
 # ---------- Complaint Table ----------
 class Complaint(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
     account_id = ForeignKey(references=Account)
     booking_id = ForeignKey(references=ServiceBooking, null=True)
-    category = Varchar(length=50) 
+    category = Varchar(length=50)
     description = Text()
     proof_image = Text(null=True)
     status = Varchar(length=20, choices=COMPLAINT_STATUS_CHOICES, default="pending")
     created_at = Timestamptz(auto_now=True)
 
-#---------------  Login History -----------------
+
+# ---------------  Login History -----------------
 class LoginHistory(Table):
     id = UUID(primary_key=True, default=uuid.uuid4)
     account = ForeignKey(references=Account)

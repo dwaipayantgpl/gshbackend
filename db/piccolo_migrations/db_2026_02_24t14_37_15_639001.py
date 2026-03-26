@@ -2,16 +2,13 @@ from piccolo.apps.migrations.auto.migration_manager import MigrationManager
 from piccolo.columns.column_types import Integer
 from piccolo.columns.indexes import IndexMethod
 
-
 ID = "2026-02-24T14:37:15:639001"
 VERSION = "1.32.0"
 DESCRIPTION = ""
 
 
 async def forwards():
-    manager = MigrationManager(
-        migration_id=ID, app_name="db", description=DESCRIPTION
-    )
+    manager = MigrationManager(migration_id=ID, app_name="db", description=DESCRIPTION)
 
     manager.add_column(
         table_class_name="PreferenceRequirements",

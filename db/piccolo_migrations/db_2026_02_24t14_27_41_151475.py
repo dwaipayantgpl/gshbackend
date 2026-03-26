@@ -1,12 +1,13 @@
 from piccolo.apps.migrations.auto.migration_manager import MigrationManager
-from piccolo.columns.base import OnDelete
-from piccolo.columns.base import OnUpdate
-from piccolo.columns.column_types import Boolean
-from piccolo.columns.column_types import ForeignKey
-from piccolo.columns.column_types import Integer
-from piccolo.columns.column_types import Serial
-from piccolo.columns.column_types import UUID
-from piccolo.columns.column_types import Varchar
+from piccolo.columns.base import OnDelete, OnUpdate
+from piccolo.columns.column_types import (
+    UUID,
+    Boolean,
+    ForeignKey,
+    Integer,
+    Serial,
+    Varchar,
+)
 from piccolo.columns.defaults.uuid import UUID4
 from piccolo.columns.indexes import IndexMethod
 from piccolo.table import Table
@@ -38,9 +39,7 @@ class PreferenceLocation(Table, tablename="preference_location", schema=None):
     )
 
 
-class PreferenceRequirements(
-    Table, tablename="preference_requirements", schema=None
-):
+class PreferenceRequirements(Table, tablename="preference_requirements", schema=None):
     id = Serial(
         null=False,
         primary_key=True,
@@ -100,9 +99,7 @@ DESCRIPTION = ""
 
 
 async def forwards():
-    manager = MigrationManager(
-        migration_id=ID, app_name="db", description=DESCRIPTION
-    )
+    manager = MigrationManager(migration_id=ID, app_name="db", description=DESCRIPTION)
 
     manager.add_table(
         class_name="PreferenceLocation",

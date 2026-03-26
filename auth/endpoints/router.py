@@ -1,16 +1,22 @@
 # app/auth/endpoints/router.py
-from datetime import timedelta
-import datetime
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+
 from auth.logic import auth_service
-from auth.structs.dtos import ChangePasswordIn, ForgotPasswordIn, SignUpIn, SignInIn, SignInOut, SignUpOut
-from auth.logic.auth_service import get_inactive_users_report, signup, signin
-from auth.structs.dtos import MeOut
+from auth.logic.auth_service import get_inactive_users_report, get_me, signin, signup
 from auth.logic.deps import get_current_account_id
-from auth.logic.auth_service import get_me
-from db.tables import Account, Registration
+from auth.structs.dtos import (
+    ChangePasswordIn,
+    ForgotPasswordIn,
+    MeOut,
+    SignInIn,
+    SignInOut,
+    SignUpIn,
+    SignUpOut,
+)
+
 router = APIRouter()
+
 
 @router.post(
     "/signup",
@@ -36,6 +42,7 @@ async def signup_endpoint(payload: SignUpIn):
         "kind": result["kind"],
     }
 
+
 @router.post(
     "/signin",
     summary="Sign in with phone + password",
@@ -55,6 +62,7 @@ async def signin_endpoint(payload: SignInIn):
         "type": token.get("type"),
     }
 
+
 @router.get(
     "/me",
     summary="Get current user identity",
@@ -69,15 +77,17 @@ async def signin_endpoint(payload: SignInIn):
 async def me_endpoint(account_id: str = Depends(get_current_account_id)):
     return await get_me(account_id=account_id)
 
-#Change password
+
+# Change password
 @router.post("/change-password", summary="Update user password")
 async def change_password(
     payload: ChangePasswordIn,
-    account_id: str = Depends(get_current_account_id) # Ensures user is logged in
+    account_id: str = Depends(get_current_account_id),  # Ensures user is logged in
 ):
     return await auth_service.update_password(account_id, payload)
 
-#for get password
+
+# for get password
 @router.post("/forgot-password", summary="Reset password using only phone (No OTP)")
 async def forgot_password(payload: ForgotPasswordIn):
     return await auth_service.reset_password(payload)
@@ -90,19 +100,20 @@ async def inactive_users_api(months: int = 3):
     """
     try:
         data = await get_inactive_users_report(months)
-        
+
         # Format the response for the frontend table
         return {
             "status": "success",
             "count": len(data),
             "threshold_months": months,
-            "data": data
+            "data": data,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
-    
+
 
 # auth/endpoints/admin_router.py
+
 
 @router.get("/user-activity/{registration_id}")
 async def get_specific_user_activity(registration_id: str):

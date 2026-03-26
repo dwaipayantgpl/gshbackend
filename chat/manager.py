@@ -1,5 +1,7 @@
-from fastapi import WebSocket
 from typing import Dict
+
+from fastapi import WebSocket
+
 
 class ConnectionManager:
     def __init__(self):
@@ -18,6 +20,7 @@ class ConnectionManager:
         if user_id in self.active_connections:
             await self.active_connections[user_id].send_json(message)
             return True
-        return False # User is offline
+        return False  # User is offline
+
 
 manager = ConnectionManager()

@@ -1,20 +1,20 @@
-
 from typing import Dict, List
+
 from fastapi import WebSocket
+
 
 class NotificationManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str):
-     user_id = str(user_id).lower() # FORCE STRING LOWERCASE
-     if user_id not in self.active_connections:
-        self.active_connections[user_id] = []
-    
-     self.active_connections[user_id].append(websocket)
-     await websocket.accept()
-     print(f"✅ User {user_id} registered.")
+        user_id = str(user_id).lower()  # FORCE STRING LOWERCASE
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
 
+        self.active_connections[user_id].append(websocket)
+        await websocket.accept()
+        print(f"✅ User {user_id} registered.")
 
     def disconnect(self, websocket: WebSocket, user_id: str):
         if user_id in self.active_connections:
@@ -34,20 +34,20 @@ class NotificationManager:
     #             continue
 
     async def send_to_user(self, user_id: str, message: dict) -> bool:
-     user_id = str(user_id).lower()
-     if user_id in self.active_connections and self.active_connections[user_id]:
-        for connection in self.active_connections[user_id]:
-            try:
-                await connection.send_json(message)
-            except Exception:
-                continue
-        return True  # Successfully sent live
-     return False  # User was offline
-
+        user_id = str(user_id).lower()
+        if user_id in self.active_connections and self.active_connections[user_id]:
+            for connection in self.active_connections[user_id]:
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    continue
+            return True  # Successfully sent live
+        return False  # User was offline
 
     async def broadcast(self, message: dict):
         """Push notification to EVERYONE online (Admin Case)"""
         for user_id in self.active_connections:
             await self.send_to_user(user_id, message)
+
 
 notif_manager = NotificationManager()

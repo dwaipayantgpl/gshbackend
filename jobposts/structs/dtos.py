@@ -1,8 +1,10 @@
 # jobs/structs/dtos.py
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
 
 class JobRequestCreateIn(BaseModel):
     headline: str = Field(..., examples=["Need a Home Nurse"])
@@ -12,6 +14,7 @@ class JobRequestCreateIn(BaseModel):
     contact_phone: Optional[str] = None
     job_type: str  # part_time, full_time, etc.
     service_ids: List[str]  # IDs from the Service table
+
 
 class JobRequestOut(BaseModel):
     id: uuid.UUID

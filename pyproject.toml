@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 88
+exclude = ["venv", ".venv", "env", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]  # E/F = flake8, I = import sorting
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"

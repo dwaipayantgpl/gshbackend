@@ -1,5 +1,6 @@
 # db/piccolo_app.py
 import os
+
 from piccolo.conf.apps import AppConfig, table_finder
 
 CURRENT_DIRECTORY = os.path.dirname(__file__)

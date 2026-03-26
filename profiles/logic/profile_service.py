@@ -1,27 +1,45 @@
 # profiles/logic/profile_service.py
 from __future__ import annotations
+
 import base64
 import os
 import uuid
 from pathlib import Path
-from fastapi import HTTPException, UploadFile, status, File
+
+from fastapi import HTTPException, UploadFile, status
+
 from db.tables import (
     Account,
+    HelperInstitutional,
+    HelperPersonal,
     ProfilePicture,
     Registration,
-    SeekerPersonal,
     SeekerInstitutional,
-    HelperPersonal,
-    HelperInstitutional,
+    SeekerPersonal,
 )
-
 from profiles.structs.dtos import ProfileOut, ProfileUpsertIn
 
 _KIND_META = {
-    "seeker_personal": {"side": "seeker", "capacity": "personal", "table": SeekerPersonal},
-    "seeker_institutional": {"side": "seeker", "capacity": "institutional", "table": SeekerInstitutional},
-    "helper_personal": {"side": "helper", "capacity": "personal", "table": HelperPersonal},
-    "helper_institutional": {"side": "helper", "capacity": "institutional", "table": HelperInstitutional},
+    "seeker_personal": {
+        "side": "seeker",
+        "capacity": "personal",
+        "table": SeekerPersonal,
+    },
+    "seeker_institutional": {
+        "side": "seeker",
+        "capacity": "institutional",
+        "table": SeekerInstitutional,
+    },
+    "helper_personal": {
+        "side": "helper",
+        "capacity": "personal",
+        "table": HelperPersonal,
+    },
+    "helper_institutional": {
+        "side": "helper",
+        "capacity": "institutional",
+        "table": HelperInstitutional,
+    },
 }
 
 
@@ -61,8 +79,9 @@ def _validate_payload_against_registration(*, reg: Registration, kind: str) -> N
             detail=f"Role mismatch: you are '{reg.role}', but payload is for '{meta['side']}'",
         )
 
-async def _find_phone_number_by_registration(account_id:str)->Account:
-    find=await Account.objects().where(Account.id==account_id).first()
+
+async def _find_phone_number_by_registration(account_id: str) -> Account:
+    find = await Account.objects().where(Account.id == account_id).first()
     if not find:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -70,9 +89,10 @@ async def _find_phone_number_by_registration(account_id:str)->Account:
         )
     return find.phone
 
+
 async def get_my_profile(*, account_id: str) -> ProfileOut:
     reg = await _get_registration_by_account_id(account_id)
-    phoneno=await _find_phone_number_by_registration(reg.account)
+    phoneno = await _find_phone_number_by_registration(reg.account)
     # Decide default kind for GET:
     # - if role is seeker => seeker_{capacity}
     # - if role is helper => helper_{capacity}
@@ -141,8 +161,8 @@ async def upsert_my_profile(*, account_id: str, payload: ProfileUpsertIn) -> Pro
     )
 
 
-
 UPLOAD_DIR = Path(r"C:\CompanyProject\gshbe\static\uploads\profile_pics")
+
 
 async def save_profile_file_logic(reg_id: str, file: UploadFile, mode: str = "post"):
     # 1. Ensure directory exists
@@ -157,29 +177,34 @@ async def save_profile_file_logic(reg_id: str, file: UploadFile, mode: str = "po
 
     # 3. Determine the correct MIME type (Standardizing image/jpg to image/jpeg)
     # We use mimetypes.guess_type or a manual mapping for accuracy
-    mime_map = {
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png"
-    }
+    mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
     final_mime = mime_map.get(extension, "image/jpeg")
 
     # 4. Fetch Account Info
     reg = await Registration.objects().get(Registration.id == reg_id).run()
     if not reg:
         return {"status": "error", "message": "User registration not found."}
-    
+
     account_id = reg.account
 
     # 5. Check Database for Existing Record
-    existing = await ProfilePicture.objects().where(
-        ProfilePicture.account == account_id
-    ).first().run()
+    existing = (
+        await ProfilePicture.objects()
+        .where(ProfilePicture.account == account_id)
+        .first()
+        .run()
+    )
 
     if mode == "post" and existing:
-        return {"status": "error", "message": "Picture already exists. Use PATCH to update."}
+        return {
+            "status": "error",
+            "message": "Picture already exists. Use PATCH to update.",
+        }
     if mode == "patch" and not existing:
-        return {"status": "error", "message": "No picture found. Use POST to upload first."}
+        return {
+            "status": "error",
+            "message": "No picture found. Use POST to upload first.",
+        }
 
     try:
         # 6. Generate unique filename to avoid collisions
@@ -196,41 +221,39 @@ async def save_profile_file_logic(reg_id: str, file: UploadFile, mode: str = "po
         # 8. Database Update/Insert
         if mode == "patch":
             # If replacing, you could delete the old file here
-            await ProfilePicture.update({
-                ProfilePicture.file_path: relative_path
-            }).where(ProfilePicture.account == account_id).run()
+            await (
+                ProfilePicture.update({ProfilePicture.file_path: relative_path})
+                .where(ProfilePicture.account == account_id)
+                .run()
+            )
         else:
             await ProfilePicture.insert(
                 ProfilePicture(account=account_id, file_path=relative_path)
             ).run()
 
         return {
-            "status": "success", 
-            "path": str(file_save_path), 
+            "status": "success",
+            "path": str(file_save_path),
             "filename": unique_name,
-            "mime_type": final_mime 
+            "mime_type": final_mime,
         }
 
     except Exception as e:
         return {"status": "error", "message": f"Internal Save Error: {str(e)}"}
 
 
-
-
 async def get_profile_base64_logic(reg_id: str):
     reg = await Registration.objects().get(Registration.id == reg_id).run()
-    
+
     if not reg:
         return None
 
-
-    record = await ProfilePicture.objects().get(
-        ProfilePicture.account == reg.account
-    ).run()
+    record = (
+        await ProfilePicture.objects().get(ProfilePicture.account == reg.account).run()
+    )
 
     if not record or not record.file_path:
         return None
-    
 
     full_path = Path(r"C:\CompanyProject\gshbe") / record.file_path
 
@@ -241,11 +264,11 @@ async def get_profile_base64_logic(reg_id: str):
     try:
         with open(full_path, "rb") as image_file:
             binary_data = image_file.read()
-            base64_encoded = base64.b64encode(binary_data).decode('utf-8')
-            
+            base64_encoded = base64.b64encode(binary_data).decode("utf-8")
+
             ext = os.path.splitext(record.file_path)[1].lower().replace(".", "")
             mime_type = "image/jpeg" if ext in ["jpg", "jpeg"] else f"image/{ext}"
-            
+
             return f"data:{mime_type};base64,{base64_encoded}"
     except Exception as e:
         print(f"Error reading profile image file: {e}")

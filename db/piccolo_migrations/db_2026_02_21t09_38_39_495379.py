@@ -1,20 +1,22 @@
-from piccolo.columns.choices import Choice
+import decimal
+
 from piccolo.apps.migrations.auto.migration_manager import MigrationManager
-from piccolo.columns.base import OnDelete
-from piccolo.columns.base import OnUpdate
-from piccolo.columns.column_types import Boolean
-from piccolo.columns.column_types import ForeignKey
-from piccolo.columns.column_types import Integer
-from piccolo.columns.column_types import Numeric
-from piccolo.columns.column_types import Text
-from piccolo.columns.column_types import Timestamptz
-from piccolo.columns.column_types import UUID
-from piccolo.columns.column_types import Varchar
+from piccolo.columns.base import OnDelete, OnUpdate
+from piccolo.columns.choices import Choice
+from piccolo.columns.column_types import (
+    UUID,
+    Boolean,
+    ForeignKey,
+    Integer,
+    Numeric,
+    Text,
+    Timestamptz,
+    Varchar,
+)
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
 from piccolo.columns.defaults.uuid import UUID4
 from piccolo.columns.indexes import IndexMethod
 from piccolo.table import Table
-import decimal
 
 
 class Account(Table, tablename="account", schema=None):
@@ -121,9 +123,7 @@ DESCRIPTION = ""
 
 
 async def forwards():
-    manager = MigrationManager(
-        migration_id=ID, app_name="db", description=DESCRIPTION
-    )
+    manager = MigrationManager(migration_id=ID, app_name="db", description=DESCRIPTION)
 
     manager.add_table(
         class_name="Complaint", tablename="complaint", schema=None, columns=None
@@ -172,9 +172,7 @@ async def forwards():
         columns=None,
     )
 
-    manager.add_table(
-        class_name="Skill", tablename="skill", schema=None, columns=None
-    )
+    manager.add_table(class_name="Skill", tablename="skill", schema=None, columns=None)
 
     manager.add_table(
         class_name="HelperPreferredService",
@@ -219,9 +217,7 @@ async def forwards():
         class_name="Service", tablename="service", schema=None, columns=None
     )
 
-    manager.add_table(
-        class_name="Job", tablename="job", schema=None, columns=None
-    )
+    manager.add_table(class_name="Job", tablename="job", schema=None, columns=None)
 
     manager.add_table(
         class_name="MessageAttachment",

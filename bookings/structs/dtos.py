@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
-from datetime import date, datetime
-from uuid import UUID
+from datetime import date
 from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class BookingSummaryOut(BaseModel):
     booking_id: UUID
@@ -12,6 +14,7 @@ class BookingSummaryOut(BaseModel):
     address: str
     total_price: float
     status: str
+
 
 class DirectBookingCreate(BaseModel):
     helper_id: UUID
@@ -30,6 +33,7 @@ class DirectBookingCreate(BaseModel):
     preferences: Optional[dict] = None
     payment_method: str
     total_price: Optional[float] = None
+
 
 class BookingUpdateSchema(BaseModel):
     customer_name: Optional[str] = None

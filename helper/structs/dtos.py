@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import List, Optional, Literal
-from pydantic import BaseModel, Field
+from typing import List, Literal, Optional
 
+from pydantic import BaseModel, Field
 
 JobType = Literal["part_time", "full_time", "one_time", "subscription"]
 
@@ -10,6 +10,7 @@ JobType = Literal["part_time", "full_time", "one_time", "subscription"]
 # ----------------------------
 # Preference
 # ----------------------------
+
 
 class HelperPreferenceUpsertIn(BaseModel):
     city: Optional[str] = Field(None, examples=["Kolkata"])
@@ -33,6 +34,7 @@ class HelperPreferenceOut(BaseModel):
 # ----------------------------
 # Experience
 # ----------------------------
+
 
 class HelperExperienceIn(BaseModel):
     year_from: Optional[int] = Field(None, ge=1900, le=2100, examples=[2019])

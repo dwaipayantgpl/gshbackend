@@ -1,16 +1,16 @@
 # profiles/endpoints/router.py
 import base64
 
-from fastapi import APIRouter, Depends, Body, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 
 from auth.logic.deps import get_current_account_id, get_current_registration
-from profiles.logic import profile_service
 from db.tables import Registration
+from profiles.logic import profile_service
 from profiles.logic.profile_service import get_my_profile, upsert_my_profile
 from profiles.structs.dtos import ProfileOut, ProfileUpsertIn
 
 router = APIRouter()
+
 
 @router.get("/me", response_model=ProfileOut, summary="Get My Profile")
 async def me_profile(account_id: str = Depends(get_current_account_id)):
@@ -81,18 +81,17 @@ async def upsert_profile(
     return await upsert_my_profile(account_id=account_id, payload=payload)
 
 
-
 # @router.post("/picture")
 # async def upload_picture(
 #     file: UploadFile = File(...),
 #     current_reg: Registration = Depends(get_current_registration)
 # ):
 #     result = await profile_service.save_profile_file_logic(str(current_reg.id), file, mode="post")
-    
+
 #     if result.get("status") == "error":
 #         # This will now correctly trigger if the extension is wrong
 #         raise HTTPException(status_code=400, detail=result["message"])
-    
+
 #     return FileResponse(
 #         path=result["path"],
 #         filename=result["filename"],
@@ -104,23 +103,25 @@ async def upsert_profile(
 @router.post("/picture")
 async def upload_picture(
     file: UploadFile = File(...),
-    current_reg: Registration = Depends(get_current_registration)
+    current_reg: Registration = Depends(get_current_registration),
 ):
-    result = await profile_service.save_profile_file_logic(str(current_reg.id), file, mode="post")
-    
+    result = await profile_service.save_profile_file_logic(
+        str(current_reg.id), file, mode="post"
+    )
+
     if result.get("status") == "error":
         raise HTTPException(status_code=400, detail=result["message"])
-    
+
     file_path = result["path"]
-    
+
     try:
         # 1. Read the binary content of the saved file
         with open(file_path, "rb") as image_file:
             binary_data = image_file.read()
-            
+
             # 2. Encode to base64
-            base64_encoded = base64.b64encode(binary_data).decode('utf-8')
-            
+            base64_encoded = base64.b64encode(binary_data).decode("utf-8")
+
             # 3. Format as a Data URL (optional, but very helpful for frontends)
             # Example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEU..."
             mime_type = result.get("mime_type", "image/jpeg")
@@ -129,33 +130,37 @@ async def upload_picture(
         return {
             "status": "success",
             "image_base64": base64_string,
-            "filename": result["filename"]
+            "filename": result["filename"],
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process image: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process image: {str(e)}"
+        )
 
 
 @router.patch("/picture")
 async def update_picture(
     file: UploadFile = File(...),
-    current_reg: Registration = Depends(get_current_registration)
+    current_reg: Registration = Depends(get_current_registration),
 ):
-    result = await profile_service.save_profile_file_logic(str(current_reg.id), file, mode="patch")
-    
+    result = await profile_service.save_profile_file_logic(
+        str(current_reg.id), file, mode="patch"
+    )
+
     if result.get("status") == "error":
         raise HTTPException(status_code=400, detail=result["message"])
-    
+
     file_path = result["path"]
-    
+
     try:
         # 1. Read the binary content of the saved file
         with open(file_path, "rb") as image_file:
             binary_data = image_file.read()
-            
+
             # 2. Encode to base64
-            base64_encoded = base64.b64encode(binary_data).decode('utf-8')
-            
+            base64_encoded = base64.b64encode(binary_data).decode("utf-8")
+
             # 3. Format as a Data URL (optional, but very helpful for frontends)
             # Example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEU..."
             mime_type = result.get("mime_type", "image/jpeg")
@@ -164,27 +169,24 @@ async def update_picture(
         return {
             "status": "success",
             "image_base64": base64_string,
-            "filename": result["filename"]
+            "filename": result["filename"],
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process image: {str(e)}")
-    
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process image: {str(e)}"
+        )
+
 
 @router.get("/picture/base64")
-async def get_my_picture(
-    current_reg: Registration = Depends(get_current_registration)
-):
+async def get_my_picture(current_reg: Registration = Depends(get_current_registration)):
     base64_str = await profile_service.get_profile_base64_logic(str(current_reg.id))
-    
+
     if not base64_str:
         raise HTTPException(
-            status_code=404, 
-            detail="Profile picture not found. Please upload one first."
+            status_code=404,
+            detail="Profile picture not found. Please upload one first.",
         )
 
     # Returning the exact same structure as your POST/PATCH
-    return {
-        "status": "success",
-        "image_base64": base64_str
-    }
+    return {"status": "success", "image_base64": base64_str}

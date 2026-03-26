@@ -1,30 +1,31 @@
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
-from auth.logic.deps import get_current_account_id, get_current_registration, get_current_user_role
+from auth.logic.deps import (
+    get_current_account_id,
+    get_current_registration,
+)
 from chat.logic import service
-from helper.logic import service
+from db.tables import Registration
 from helper.endpoints import router
-
-from db.tables import HelperService, Registration
+from helper.logic import service
 from helper.logic.service import (
-    get_preference_by_registration_id,
-    get_specific_helper_full_details,
-    list_experience_by_registration_id,
-    get_my_preference,
-    upsert_my_preference,
-    list_my_experience,
     create_my_experience,
-    update_my_experience,
     delete_my_experience,
+    get_my_preference,
+    get_preference_by_registration_id,
+    list_experience_by_registration_id,
+    list_my_experience,
+    update_my_experience,
+    upsert_my_preference,
 )
 from helper.structs.dtos import (
-    HelperPreferenceUpsertIn,
-    HelperPreferenceOut,
+    DeleteOut,
     HelperExperienceIn,
     HelperExperienceOut,
-    DeleteOut,
+    HelperPreferenceOut,
+    HelperPreferenceUpsertIn,
 )
 
 router = APIRouter(tags=["helper"])
@@ -33,6 +34,7 @@ router = APIRouter(tags=["helper"])
 # ----------------------------
 # Public (ANYONE)
 # ----------------------------
+
 
 @router.get(
     "/{registration_id}/preferences",
@@ -136,6 +138,7 @@ async def get_public_experience(registration_id: str):
 # Owner-only
 # ----------------------------
 
+
 @router.get(
     "/preferences/me",
     response_model=HelperPreferenceOut,
@@ -158,7 +161,9 @@ async def get_public_experience(registration_id: str):
                         "city": "Kolkata",
                         "area": "Salt Lake",
                         "job_type": "part_time",
-                        "preferred_service_ids": ["b2b9c9c2-9d0b-4c6f-9e5b-2d4cefd1d5c1"],
+                        "preferred_service_ids": [
+                            "b2b9c9c2-9d0b-4c6f-9e5b-2d4cefd1d5c1"
+                        ],
                     }
                 }
             },
@@ -395,41 +400,40 @@ async def del_experience_me(
     experience_id: str,
     account_id: str = Depends(get_current_account_id),
 ):
-    return await delete_my_experience(account_id=account_id, experience_id=experience_id)
+    return await delete_my_experience(
+        account_id=account_id, experience_id=experience_id
+    )
 
 
 @router.post("/addpreferences")
 async def add_helper_preferences(
-    data: Dict[str, Any], 
-    user: Registration = Depends(get_current_registration)
+    data: Dict[str, Any], user: Registration = Depends(get_current_registration)
 ):
     return await service.add_helper_preference_logic(data, user.id)
 
+
 @router.patch("/updatepreferences")
 async def update_helper_preferences(
-    data: Dict[str, Any], 
-    user: Registration = Depends(get_current_registration)
+    data: Dict[str, Any], user: Registration = Depends(get_current_registration)
 ):
     return await service.update_helper_preference_logic(data, user.id)
 
+
 @router.get("/my-preferences")
-async def get_my_preferences(
-    user: Registration = Depends(get_current_registration)
-):
+async def get_my_preferences(user: Registration = Depends(get_current_registration)):
     return await service.get_helper_preference_logic(user.id)
 
-#find matched seekers
+
+# find matched seekers
 @router.get("/find-my-seekers")
 async def find_my_seekers(user: Registration = Depends(get_current_registration)):
     return await service.get_matches_for_helper_logic(user.id)
 
-#find helpers details using helper id
+
+# find helpers details using helper id
 # app/routers/helper.py
 @router.get("/helper-details/{target_id}")
 async def get_helper_details_endpoint(
-    target_id: str, 
-    current_reg: Registration = Depends(get_current_registration) 
+    target_id: str, current_reg: Registration = Depends(get_current_registration)
 ):
     return await service.get_specific_helper_full_details(target_id, current_reg)
-
-

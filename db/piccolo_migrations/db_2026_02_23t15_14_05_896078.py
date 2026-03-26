@@ -1,7 +1,7 @@
 from piccolo.apps.migrations.auto.migration_manager import MigrationManager
+from piccolo.columns.choices import Choice
 from piccolo.columns.column_types import Varchar
 from piccolo.columns.indexes import IndexMethod
-from piccolo.columns.choices import Choice
 
 ID = "2026-02-23T15:14:05:896078"
 VERSION = "1.32.0"
@@ -9,9 +9,7 @@ DESCRIPTION = ""
 
 
 async def forwards():
-    manager = MigrationManager(
-        migration_id=ID, app_name="db", description=DESCRIPTION
-    )
+    manager = MigrationManager(migration_id=ID, app_name="db", description=DESCRIPTION)
 
     manager.add_column(
         table_class_name="SeekerPreference",

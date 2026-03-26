@@ -5,10 +5,10 @@ from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
-
 # ----------------------------
 # Request payloads (Swagger oneOf)
 # ----------------------------
+
 
 class SeekerPersonalUpsert(BaseModel):
     kind: Literal["seeker_personal"] = "seeker_personal"
@@ -63,11 +63,12 @@ ProfileUpsertIn = Annotated[
 # Response models
 # ----------------------------
 
+
 class ProfileOut(BaseModel):
     account_id: Optional[str] = None
     registration_id: str
     role: str
-    phone:str
+    phone: str
     capacity: str
     profile_kind: Optional[str] = None
     profile: dict = Field(default_factory=dict)
