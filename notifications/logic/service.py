@@ -1,4 +1,6 @@
 import json
+import uuid
+from typing import Any, Dict
 
 from db.tables import Notifiactions, Registration
 from notifications.logic.socket import notif_manager
@@ -52,6 +54,9 @@ class NotificationService:
                 (Notifiactions.recipient == user_id) & (Notifiactions.is_read == False)
             )
             .order_by(Notifiactions.created_at)
+            .offset(Notifiactions.created_at)
+            .as_of(Notifiactions.created_at)
+            .callback()
             .run()
         )
 
@@ -59,7 +64,7 @@ class NotificationService:
             return []
 
         await (
-            Notifiactions.update({Notifiactions.is_read: True})
+            Notifiactions.update({Notifiactions.is_read: False})
             .where(Notifiactions.id.is_in([m.id for m in unread]))
             .run()
         )
@@ -138,3 +143,101 @@ class NotificationService:
         }
 
         await notif_manager.broadcast(payload)
+
+
+async def get_my_notifications_logic(
+    user_id: uuid.UUID, unread_only: bool = False, limit: int = 20, offset: int = 0
+) -> Dict[str, Any]:
+    """
+    Business logic to fetch and count notifications for a specific user.
+    """
+    # 1. Base query filtered by recipient
+    query = Notifiactions.select().where(Notifiactions.recipient == user_id)
+
+    # 2. Filter by status if requested
+    if unread_only:
+        query = query.where(Notifiactions.is_read == False)
+
+    # 3. Execute with sorting and pagination
+    notifications = (
+        await query.order_by(Notifiactions.created_at, ascending=False)
+        .limit(limit)
+        .offset(offset)
+        .run()
+    )
+
+    # 4. Count total unread for the UI badge
+    unread_count = (
+        await Notifiactions.count()
+        .where((Notifiactions.recipient == user_id) & (Notifiactions.is_read == False))
+        .run()
+    )
+
+    return {
+        "unread_count": unread_count,
+        "count": len(notifications),
+        "notifications": notifications,
+    }
+
+
+async def mark_as_read_logic(notification_id: uuid.UUID, user_id: uuid.UUID):
+    """
+    Business logic to mark a notification as read after verifying ownership.
+    """
+    notification = (
+        await Notifiactions.objects()
+        .where(
+            (Notifiactions.id == notification_id) & (Notifiactions.recipient == user_id)
+        )
+        .first()
+        .run()
+    )
+
+    if not notification:
+        return False
+
+    await (
+        Notifiactions.update({Notifiactions.is_read: True})
+        .where(Notifiactions.id == notification_id)
+        .run()
+    )
+
+    return True
+
+
+async def get_missed_notifications(registration_id: str):
+    # Fetch notifications where is_read is False
+    unread_notifications = (
+        await Notifiactions.objects()
+        .where(
+            (Notifiactions.recipient == registration_id)
+            & (Notifiactions.is_read == False)
+        )
+        .order_by(Notifiactions.created_at, ascending=False)
+        .run()
+    )
+
+    # Format the data to match your developer's JSON requirement
+    formatted_data = []
+    for n in unread_notifications:
+        formatted_data.append(
+            {
+                "notification_id": str(n.id),
+                "category": n.category,
+                "title": n.title,
+                "content": n.content,
+                "booking_id": str(n.booking_id) if n.booking_id else None,
+                "metadata": n.metadata,  # This is already a JSONB field
+                "created_at": n.created_at.isoformat(),
+            }
+        )
+    formatted_data.append({
+        "notification":str(n.id),
+        "category":n.category                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+    })
+    return {
+        "type": "missed_notifications",
+        "count": len(formatted_data),
+        "data": formatted_data,
+    }
+

@@ -12,9 +12,20 @@ from pydantic import BaseModel, Field
 
 class SeekerPersonalUpsert(BaseModel):
     kind: Literal["seeker_personal"] = "seeker_personal"
-    name: str
-    city: str
-    area: str
+    name: Optional[str] = None
+    city: Optional[str] = None
+    area: Optional[str] = None
+
+
+class HelperPersonalUpsert(BaseModel):
+    kind: Literal["helper_personal"] = "helper_personal"
+    name: Optional[str] = None
+    city: Optional[str] = None
+    area: Optional[str] = None
+    age: Optional[int] = None
+    faith: Optional[str] = None
+    languages: Optional[str] = None
+    years_of_experience: Optional[int] = None
 
 
 class SeekerInstitutionalUpsert(BaseModel):
@@ -24,18 +35,6 @@ class SeekerInstitutionalUpsert(BaseModel):
     area: str
     institution_type: Optional[str] = None
     phone: Optional[str] = None
-
-
-class HelperPersonalUpsert(BaseModel):
-    kind: Literal["helper_personal"] = "helper_personal"
-    name: str
-    city: str
-    area: str
-    age: Optional[int] = None
-    faith: Optional[str] = None
-    languages: Optional[str] = None
-    phone: Optional[str] = None
-    years_of_experience: Optional[int] = None
 
 
 class HelperInstitutionalUpsert(BaseModel):

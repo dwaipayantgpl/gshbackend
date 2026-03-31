@@ -128,28 +128,38 @@ async def get_my_profile(*, account_id: str) -> ProfileOut:
 
 
 async def upsert_my_profile(*, account_id: str, payload: ProfileUpsertIn) -> ProfileOut:
+    # 1. Get current registration and phone
     reg = await _get_registration_by_account_id(account_id)
-    phoneno = await _find_phone_number_by_registration(reg.account)
+    
+    # Securely fetch account to get the phone number
+    account_row = await Account.objects().where(Account.id == account_id).first()
+    phoneno = account_row.phone if account_row else "N/A"
+    
     kind = payload.kind
     _validate_payload_against_registration(reg=reg, kind=kind)
 
     meta = _KIND_META[kind]
     table = meta["table"]
 
-    # Upsert on (registration) which is unique for these profile tables
+    # 2. Extract update data (excluding the discriminator 'kind')
+    # exclude_unset=True is key: it means we only update fields the frontend actually sent
+    update_data = payload.model_dump(exclude={"kind"}, exclude_unset=True)
+
+    # 3. Check if profile exists
     existing = await table.objects().where(table.registration == reg.id).first()
 
-    data = payload.model_dump(exclude={"kind"}, exclude_unset=True)
-
     if existing:
-        for k, v in data.items():
-            setattr(existing, k, v)
-        await existing.save()
+        # Update only the fields provided in the payload
+        for key, value in update_data.items():
+            setattr(existing, key, value)
+        await existing.save().run()
         row = existing
     else:
-        row = table(registration=reg.id, **data)
-        await row.save()
+        # Create new profile record
+        row = table(registration=reg.id, **update_data)
+        await row.save().run()
 
+    # 4. Return unified profile response
     return ProfileOut(
         account_id=str(account_id),
         registration_id=str(reg.id),
@@ -158,6 +168,71 @@ async def upsert_my_profile(*, account_id: str, payload: ProfileUpsertIn) -> Pro
         capacity=reg.capacity,
         profile_kind=kind,
         profile=row.to_dict(),
+    )
+
+
+# 🔒 SECURITY: Fields that the user is NOT allowed to change via this API
+PROTECTED_FIELDS = {
+    "id", "registration", "account", "phone", 
+    "avg_rating", "rating_count", "created_at"
+}
+
+async def patch_my_profile_smart(*, account_id: str, payload_data: dict) -> ProfileOut:
+    """
+    Smart Patch: Automatically determines the correct profile table 
+    based on the user's Registration record and applies partial updates.
+    """
+    # 1. Look up the registration record to find role and capacity
+    reg = await Registration.objects().where(Registration.account == account_id).first().run()
+    if not reg:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Registration record not found for this account."
+        )
+
+    # 2. Determine the "Kind" (e.g., helper_personal)
+    # Default to seeker if role is 'both' or 'admin' for profile purposes
+    side = reg.role if reg.role in ("seeker", "helper") else "seeker"
+    kind = f"{side}_{reg.capacity}"
+
+    meta = _KIND_META.get(kind)
+    if not meta:
+        raise HTTPException(status_code=500, detail="Invalid profile configuration.")
+    
+    table = meta["table"]
+
+    # 3. Fetch current account for the phone number (Safety check)
+    account_row = await Account.objects().where(Account.id == account_id).first().run()
+    phoneno = account_row.phone if account_row else "N/A"
+
+    # 4. Check if a profile record already exists for this registration
+    existing = await table.objects().where(table.registration == reg.id).first().run()
+
+    if existing:
+        # --- PARTIAL UPDATE ---
+        for key, value in payload_data.items():
+            # Only update if the field exists in DB and is NOT protected
+            if hasattr(existing, key) and key not in PROTECTED_FIELDS:
+                setattr(existing, key, value)
+        
+        await existing.save().run()
+        row = existing
+    else:
+        # --- FIRST TIME CREATION ---
+        # Strip out any protected fields sent in the initial payload
+        clean_data = {k: v for k, v in payload_data.items() if k not in PROTECTED_FIELDS}
+        row = table(registration=reg.id, **clean_data)
+        await row.save().run()
+
+    # 5. Return the unified response
+    return ProfileOut(
+        account_id=str(account_id),
+        registration_id=str(reg.id),
+        role=reg.role,
+        phone=phoneno,
+        capacity=reg.capacity,
+        profile_kind=kind,
+        profile=row.to_dict()
     )
 
 

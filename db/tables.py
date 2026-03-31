@@ -81,6 +81,7 @@ NOTIFICATION_CATEGORY_CHOICES = [
     Choice("rating_reminder", "rating_reminder"),
     Choice("admin_broadcast", "admin_broadcast"),
 ]
+
 # ---------- Core identity ----------
 
 

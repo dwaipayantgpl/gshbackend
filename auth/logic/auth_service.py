@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from asyncpg.exceptions import UniqueViolationError
 from fastapi import HTTPException, status
@@ -6,7 +6,16 @@ from fastapi import HTTPException, status
 from auth.logic.passwords import hash_password, verify_password
 from auth.logic.tokens import create_access_token
 from auth.structs.dtos import ChangePasswordIn, ForgotPasswordIn
-from db.tables import Account, BlacklistedUser, LoginHistory, Registration
+from db.tables import (
+    Account,
+    BlacklistedUser,
+    HelperInstitutional,
+    HelperPersonal,
+    LoginHistory,
+    Registration,
+    SeekerInstitutional,
+    SeekerPersonal,
+)
 
 
 async def signup(*, phone: str, password: str, role: str, capacity: str) -> dict:
@@ -64,12 +73,13 @@ async def signin(*, phone: str, password: str) -> dict:
     reg = await Registration.objects().where(Registration.account == account.id).first()
 
     if reg:
-        await LoginHistory.insert(
+        await (
             LoginHistory(
-                account=account.id,
-                registration=reg.id,
+                account=account.id, registration=reg.id, login_at=datetime.now()
             )
-        ).run()
+            .save()
+            .run()
+        )
     user_type = None
     if reg:
         if reg.role in ("seeker", "helper"):
@@ -145,49 +155,112 @@ async def reset_password(payload: ForgotPasswordIn):
 
 
 async def get_inactive_users_report(months: int = 3):
-    cutoff_date = datetime.now() - timedelta(days=months * 30)
-    report = (
-        await Registration.select(
-            # Registration.full_name,
-            Registration.role,
-            Account.phone,
-        )
-        .join(Account, Account.id == Registration.account)
-        .where((Account.last_login < cutoff_date) | (Account.last_login is None))
-        .run()
-    )
+    # 1. Setup Timezone-aware Cutoff
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=months * 30)
 
-    return report
+    # 2. Get all registrations and their account info
+    all_regs = await Registration.objects().prefetch(Registration.account).run()
+
+    report_data = []
+
+    for reg in all_regs:
+        # 3. Get the absolute LATEST login for this specific registration
+        latest_login = (
+            await LoginHistory.objects()
+            .where(LoginHistory.registration == reg.id)
+            .order_by(LoginHistory.login_at, ascending=False)
+            .first()
+            .run()
+        )
+
+        last_login_at = latest_login.login_at if latest_login else None
+
+        # 4. Filter Logic
+        is_inactive = False
+        if last_login_at is None or last_login_at < cutoff_date:
+            is_inactive = True
+
+        if is_inactive:
+            report_data.append(
+                {
+                    "account_id": str(reg.account.id),  # <-- Added this line
+                    "registration_id": str(reg.id),
+                    "phone": reg.account.phone,
+                    "role": reg.role,
+                    "capacity": reg.capacity,
+                    "last_login": last_login_at,
+                    "status": "Never Logged In"
+                    if last_login_at is None
+                    else "Inactive",
+                }
+            )
+
+    return report_data
 
 
 async def check_user_activity_status(registration_id: str):
-    # 1. Calculate the 3-month cutoff
-    three_months_ago = datetime.now() - timedelta(days=90)
+    # 1. FIX: Make the cutoff date timezone-aware (UTC)
+    three_months_ago = datetime.now(timezone.utc) - timedelta(days=90)
 
-    # 2. Get User Details + Account info in one Join
-    user_data = (
-        await Registration.select(
-            Registration.full_name, Registration.role, Account.phone, Account.last_login
-        )
-        .join(Account, Account.id == Registration.account)
+    # 2. Get Core Registration & Account info
+    reg_data = (
+        await Registration.objects()
         .where(Registration.id == registration_id)
+        .prefetch(Registration.account)
         .first()
         .run()
     )
 
-    if not user_data:
+    if not reg_data:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 3. Check if last_login is within the last 3 months
-    last_login = user_data["last_login"]
+    # 3. Fetch the LATEST login from LoginHistory
+    latest_login_record = (
+        await LoginHistory.objects()
+        .where(LoginHistory.registration == registration_id)
+        .order_by(LoginHistory.login_at, ascending=False)
+        .first()
+        .run()
+    )
 
+    last_login = latest_login_record.login_at if latest_login_record else None
+
+    # 4. Profile lookup logic (unchanged)
+    role = reg_data.role
+    capacity = reg_data.capacity
+    kind = f"{role}_{capacity}"
+    profile_map = {
+        "seeker_personal": SeekerPersonal,
+        "seeker_institutional": SeekerInstitutional,
+        "helper_personal": HelperPersonal,
+        "helper_institutional": HelperInstitutional,
+    }
+    profile_table = profile_map.get(kind)
+    user_name = "Unknown"
+
+    if profile_table:
+        profile = (
+            await profile_table.objects()
+            .where(profile_table.registration == registration_id)
+            .first()
+            .run()
+        )
+        if profile:
+            user_name = profile.name
+
+    # 5. Logic check (This is where the error was happening)
     is_active_recently = False
     if last_login:
-        # If last_login is newer (greater) than 3 months ago
+        # Both sides are now timezone-aware, so they can be compared
         is_active_recently = last_login > three_months_ago
 
     return {
-        "user_details": user_data,
+        "user_details": {
+            "name": user_name,
+            "role": role,
+            "phone": reg_data.account.phone,
+            "last_login": last_login,
+        },
         "is_active_in_last_3_months": is_active_recently,
         "last_login_date": last_login,
         "cutoff_date_used": three_months_ago,

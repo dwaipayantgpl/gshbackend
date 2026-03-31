@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from auth.logic import auth_service
 from auth.logic.auth_service import get_inactive_users_report, get_me, signin, signup
-from auth.logic.deps import get_current_account_id
+from auth.logic.deps import get_current_account_id, require_admin
 from auth.structs.dtos import (
     ChangePasswordIn,
     ForgotPasswordIn,
@@ -93,15 +93,18 @@ async def forgot_password(payload: ForgotPasswordIn):
     return await auth_service.reset_password(payload)
 
 
-@router.get("/reports/inactive-users")
-async def inactive_users_api(months: int = 3):
+@router.get("/inactive-users")
+async def inactive_users_api(
+    months: int = 3, 
+    admin_id: str = Depends(require_admin) # 🔒 Admin Check
+):
     """
     Get full details of users who haven't logged in for a long time.
+    Only accessible by Admin.
     """
     try:
         data = await get_inactive_users_report(months)
 
-        # Format the response for the frontend table
         return {
             "status": "success",
             "count": len(data),
@@ -109,7 +112,11 @@ async def inactive_users_api(months: int = 3):
             "data": data,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
+        # Log the error here for internal debugging
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Database Error: {str(e)}"
+        )
 
 
 # auth/endpoints/admin_router.py

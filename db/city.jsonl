@@ -1,0 +1,42 @@
+{"city": "Kolkata Municipal Corporation", "area": ["North Kolkata", "Central Kolkata", "South Kolkata", "East Kolkata side", "Cossipore", "Shyambazar", "Sovabazar", "Hatibagan", "Maniktala", "Sealdah", "BBD Bagh", "Burrabazar", "Bowbazar", "Park Street", "Bhawanipore", "Alipore", "Ballygunge", "Gariahat", "Kasba", "Jadavpur", "Tollygunge", "Behala", "Garia", "Patuli", "Tangra", "Topsia", "Anandapur", "Mukundapur"]}
+{"city": "Howrah Municipal Corporation", "area": ["Howrah Maidan", "Salkia", "Shibpur", "Liluah", "Bally side", "Ramrajatala", "Kadamtala", "Belilious Road", "Ghusuri", "Santragachi side"]}
+{"city": "Bidhannagar Municipal Corporation", "area": ["Salt Lake Sector I", "II", "III", "Karunamoyee", "City Centre", "Lake Town side", "Rajarhat", "Gopalpur", "Baguiati", "Kestopur", "Teghoria", "Kaikhali", "Raghunathpur", "Hatiara", "Atghara", "New Town side"]}
+{"city": "Chandernagore Municipal Corporation", "area": ["Chandannagar Strand", "Gondalpara", "Bhadreswar-facing side", "Bagbazar", "Khalisani", "Station Road / GT Road belt", "old French town core"]}
+{"city": "Baranagar", "area": ["Baranagar Bazar", "Sinthi side", "Tobin Road", "Alambazar", "Dunlop side", "Bonhooghly side", "Kuthighat"]}
+{"city": "Barrackpore", "area": ["Barrackpore Station area", "Cantonment", "Talpukur", "Chiriamore", "Gandhi Ghat", "Race Course side", "BT Road belt"]}
+{"city": "Bhatpara", "area": ["Bhatpara Station area", "Kankinara", "Jagatdal belt", "Palta side", "old mill-belt localities"]}
+{"city": "Dum Dum", "area": ["Dum Dum Station area", "Motijheel", "Cantonment side", "Dum Dum Road belt", "Sinthee side", "Nagerbazar side"]}
+{"city": "Garulia", "area": ["Garulia Station area", "Garulia Bazar", "Naihati-facing side", "Garulia Main Road belt", "riverside mill localities"]}
+{"city": "Halisahar", "area": ["Halisahar Station area", "Halisahar Bazar", "Nabanagar", "Kumarhatti side", "Kanchrapara-facing side"]}
+{"city": "Kamarhati", "area": ["Belgharia side", "Kamarhati", "Ariadaha", "Dakshineswar-facing side", "Sodepur side", "BT Road localities"]}
+{"city": "Kanchrapara", "area": ["Kanchrapara Station area", "Gandhi More", "Bagmore", "Lichubagan", "Jonepur", "Barajonepur", "Kampa side", "rail workshop belt"]}
+{"city": "Khardah", "area": ["Khardah Station area", "Rahara", "Titagarh-facing side", "BT Road belt", "local bazar / ferry-side pockets"]}
+{"city": "Madhyamgram", "area": ["Madhyamgram Chowmatha", "Madhyamgram Station area", "Hridaypur side", "Doltala", "New Barrackpore-facing pockets", "Jessore Road belt"]}
+{"city": "Naihati", "area": ["Naihati Station area", "Hazi Nagar", "Garifa", "Kathalpada", "Bankim Pally side", "Kankinara-facing side"]}
+{"city": "New Barrackpore", "area": ["New Barrackpore Station area", "Bisharpara", "Kodalia", "Nilganj Road side", "Madhyamgram-facing residential pockets"]}
+{"city": "North Barrackpore", "area": ["Palta", "Ichhapur", "Nawabganj side", "Barrackpore-facing belt", "station-linked cantonment-industrial pockets"]}
+{"city": "North Dum Dum", "area": ["Birati", "Nimta", "Belgharia side", "Birati Station area", "Nimta Bazar", "airport-side residential pockets"]}
+{"city": "Panihati", "area": ["Sodepur", "Panihati", "Ghola side", "Khardah-facing side", "BT Road corridor", "station-market localities"]}
+{"city": "South Dum Dum", "area": ["Nagerbazar", "Dum Dum Park", "Lake Town side", "Bangur Avenue", "Jessore Road belt", "airport-adjacent pockets"]}
+{"city": "Titagarh", "area": ["Titagarh Station area", "Khardah-facing side", "BT Road belt", "old mill-belt pockets", "riverside localities"]}
+{"city": "Barasat", "area": ["Barasat Station area", "Champadali More", "Colony More", "Kazipara", "Hridaypur side", "NH-12 / Jessore Road belt"]}
+{"city": "Baruipur", "area": ["Baruipur Station area", "Baruipur Bazar", "Padmapukur side", "Champahati-facing side", "suburban growth pockets"]}
+{"city": "Budge Budge", "area": ["Budge Budge Station area", "Bazar", "river jetty side", "Akra side", "industrial-riverside belt"]}
+{"city": "Jaynagar Majilpur", "area": ["Jaynagar", "Majilpur", "Station area", "Bazar", "old town core", "suburban rail-linked neighbourhoods"]}
+{"city": "Maheshtala", "area": ["Maheshtala", "Akra", "Nungi", "Batanagar side", "Jinjira Bazar side", "river-industrial belt"]}
+{"city": "Pujali", "area": ["Pujali Station area", "riverfront side", "Budge Budge-facing pockets", "bazar and ferry-linked neighbourhoods"]}
+{"city": "Rajpur Sonarpur", "area": ["Rajpur", "Sonarpur", "Harinavi", "Malancha Mahi Nagar", "Subhasgram side", "station-linked suburban neighbourhoods"]}
+{"city": "Baidyabati", "area": ["Baidyabati Station area", "GT Road belt", "Sheoraphuli-facing side", "Telinipara side", "old town core"]}
+{"city": "Bansberia", "area": ["Bansberia Station area", "Hanseswari side", "Triveni-facing pockets", "bazar and temple-centred localities"]}
+{"city": "Bhadreswar", "area": ["Bhadreswar Station area", "Telinipara", "Champdani-facing side", "GT Road / mill-belt neighbourhoods"]}
+{"city": "Champdani", "area": ["Champdani", "Baidyabati-facing side", "Bhadreswar-facing side", "station-market and mill-belt localities"]}
+{"city": "Dankuni", "area": ["Dankuni Station area", "Housing More side", "toll / expressway belt", "industrial and transport-linked pockets"]}
+{"city": "Hugli-Chinsurah", "area": ["Chinsurah", "Hooghly", "Court area", "Station Road belt", "riverfront strand side", "Bandel-facing side"]}
+{"city": "Konnagar", "area": ["Konnagar Station area", "Kanaipur side", "GT Road belt", "old residential pockets"]}
+{"city": "Rishra", "area": ["Rishra Station area", "Morepukur", "Serampore-facing side", "GT Road belt", "industrial pockets"]}
+{"city": "Serampore", "area": ["Serampore Station area", "Chatra", "Mahesh", "Battala", "GT Road belt", "riverfront old town core"]}
+{"city": "Uttarpara Kotrung", "area": ["Uttarpara", "Kotrung", "Bhadrakali", "Hindmotor side", "Station Road / GT Road belt"]}
+{"city": "Gayeshpur", "area": ["Gayeshpur town core", "station-linked pockets via Kalyani side", "bazar and ward-based neighbourhoods"]}
+{"city": "Haringhata", "area": ["Haringhata town side", "university / farm belt", "Kalyani-facing suburban pockets"]}
+{"city": "Kalyani", "area": ["Kalyani A Block to F Block pattern", "Kalyani Station area", "central park side", "university side", "industrial area", "planned block-based sectors"]}
+{"city": "Uluberia", "area": ["Uluberia Station area", "Bazar", "ferry side", "NH-16 belt", "industrial pockets", "town core"]}

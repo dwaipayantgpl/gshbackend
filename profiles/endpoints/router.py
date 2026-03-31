@@ -6,7 +6,11 @@ from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from auth.logic.deps import get_current_account_id, get_current_registration
 from db.tables import Registration
 from profiles.logic import profile_service
-from profiles.logic.profile_service import get_my_profile, upsert_my_profile
+from profiles.logic.profile_service import (
+    get_my_profile,
+    patch_my_profile_smart,
+    upsert_my_profile,
+)
 from profiles.structs.dtos import ProfileOut, ProfileUpsertIn
 
 router = APIRouter()
@@ -80,24 +84,19 @@ async def upsert_profile(
 ):
     return await upsert_my_profile(account_id=account_id, payload=payload)
 
+@router.patch("/me", response_model=ProfileOut, summary="Smart Update Profile")
+async def update_my_profile(
+    payload: dict = Body(..., example={"name": "New Name", "city": "Kolkata", "age": 28}),
+    account_id: str = Depends(get_current_account_id)
+):
+    """
+    Update your profile partially. 
+    The system automatically detects if you are a Seeker or Helper.
+    Protected fields (phone, ratings, IDs) are ignored for security.
+    """
+    return await patch_my_profile_smart(account_id=account_id, payload_data=payload)
 
-# @router.post("/picture")
-# async def upload_picture(
-#     file: UploadFile = File(...),
-#     current_reg: Registration = Depends(get_current_registration)
-# ):
-#     result = await profile_service.save_profile_file_logic(str(current_reg.id), file, mode="post")
 
-#     if result.get("status") == "error":
-#         # This will now correctly trigger if the extension is wrong
-#         raise HTTPException(status_code=400, detail=result["message"])
-
-#     return FileResponse(
-#         path=result["path"],
-#         filename=result["filename"],
-#         media_type=result["mime_type"],
-#         content_disposition_type="inline"
-#     )
 
 
 @router.post("/picture")
