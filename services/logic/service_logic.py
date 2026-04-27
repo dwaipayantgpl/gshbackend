@@ -377,6 +377,15 @@ async def get_service_participants_logic(service_id: str):
             + [sp.registration.id for sp in s_prefs]
         )
     )
+    
+    if not all_reg_ids:
+     return {
+        "service_id": str(service_uuid),
+        "helpers_count": 0,
+        "seekers_count": 0,
+        "helpers": [],
+        "seekers": [],
+    }
 
     # Fetch from all 4 tables to ensure no "Unknown" users
     h_pers = (
